@@ -5,7 +5,7 @@
 2. Install the 64-bit version of [julia](http://julialang.org/downloads/)
 3. Run setup.jl
 
-This last step is accomplished by entering following commands in a terminal.
+This last step is accomplished by entering the following commands in a terminal.
 
 ```console
 $ cd "[download-location]"
@@ -36,7 +36,7 @@ In the below example, the experiment was terminated for participant 1234 at
 offset 20, and the experiment is then resumed with the second command.
 
 ```console
-$ julia run_wordstrea.jl 1234
+$ julia run_wordstream.jl 1234
 INFO: Experiment terminated at offset 20.
 $ julia run_wordstream.jl 1234 20
 ```
