@@ -16,6 +16,24 @@
 include("util.jl")
 using Psychotask
 using Lazy: @>
+using ArgParse
+
+s = ArgParseSettings(description = "Run a wordstream experiment.")
+@add_arg_table s begin
+  "sid"
+    help = "Subject id. Trials are randomized per subject."
+    required = true
+    arg_type = String
+  "skip"
+    help = "# of trials to skip. Optionally starts the experiment at a given trial offset."
+    required = false
+    arg_type = Int
+    default = 0
+end
+parsed = parse_args(ARGS,s)
+sid = parsed["sid"]
+n_skip_trials = parsed["skip"]
+
 const ms = 1/1000
 atten_dB = 20
 play(attenuate(ramp(tone(1000,1)),atten_dB))
