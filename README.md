@@ -1,7 +1,7 @@
 # Installation
 
 1. Download and unzip this project.
-2. Install the 64-bit version of [julia](http://http://julialang.org/downloads/)
+2. Install the 64-bit version of [julia](https://julialang.org/downloads/)
 3. Run setup.jl
 
 This last step is accomplished by entering following commands in a terminal.
