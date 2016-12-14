@@ -38,6 +38,9 @@ const ms = 1/1000
 atten_dB = 20
 play(attenuate(ramp(tone(1000,1)),atten_dB))
 
+# when the sid is the same, the random sequence should be the same
+srand(reinterpret(UInt32,collect(sid)))
+
 # We might be able to change this to ISI now that there
 # is no gap.
 SOA = 672.5ms
