@@ -125,11 +125,17 @@ function instruct(str)
   [m,response(iskeydown(key":space:"))]
 end
 
-# TODO: move the windowing and event handling from SFML to SDL.  (while doing
-# this, make sure the window doesn't initialize until run is called).
-
-# TODO: rewrite Trial.jl so that it is cleaner, probably using
-# a more Reactive style.
+function record_responses(event)
+  if iskeydown(event,key"q")
+    record("stream_1",time = time(event))
+  elseif iskeydown(event,key"p")
+    record("stream_2",time = time(event))
+  end
+  
+  if endofpause(event)
+    display(cross)
+  end
+end
 
 # TODO: allow trials to generate new trials, allowing for a variable number of
 # trials. (figure out the interface for this)
@@ -146,9 +152,10 @@ end
 # TODO: rather than requiring users to record a pointless
 # event, have the header specified in initialization.
 
-exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.5") do
-  addbreak(moment(t -> record("start",time=t,stimulus="none",
-                              spacing="none",phase="none")))
+exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.6",
+                 skip=n_skip_trials,
+                 columns = [:time,:trial,:stimulus,:spacing,:phase]) do
+  addbreak(moment(t -> record("start",time=t)))
 
   blank = moment() do t
     clear()
@@ -196,12 +203,11 @@ exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.5") do
       as part of the sound most of the time, and "P" otherwise.  Respond as
       promptly as you can.""") )
 
-  # TODO: record responses
   isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
   stims = repeated(syllable(:normal,:w2nw,"practice"),stimuli_per_response)
   resp = response(isresponse)
-  x = [blank,show_cross,stims...,resp]
-  addtrial(take(cycle(x),length(x)*responses_per_phase) )
+  x = [blank,show_cross,stims,resp]
+  addtrial(record_responses,take(cycle(x),length(x)*responses_per_phase) )
 
   addbreak(instruct("""
   
@@ -211,11 +217,10 @@ exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.5") do
 
   go_faster = render("Faster!")
   resp = timeout(isresponse,2response_timeout) do time
-    record("response_timeout",time=time)
     display(go_faster)
   end
-  x = [blank,show_cross,stims...,resp]
-  addtrial(take(cycle(x),length(x)*responses_per_phase) )  
+  x = [blank,show_cross,stims,resp]
+  addtrial(record_responses,take(cycle(x),length(x)*responses_per_phase) )  
   
   addbreak(instruct("""
 
@@ -236,30 +241,18 @@ exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.5") do
     context = syllable(contexts[i],words[i],"context")
     test = syllable(:normal,words[i],"test")
     # TODO: limit time for response?
-    # TODO: I can create a higher level primitive
-    # that makes this easier to use: e.g. "q" => "stream_1", "p" => "stream_2"
     go_faster = render("Faster!")
     r = timeout(isresponse,response_timeout) do time
       record("response_timeout",time=time)
       display(go_faster)
     end
 
-    x = [show_cross,repeated(context,stimuli_per_response)...,r]
+    x = [show_cross,repeated(context,stimuli_per_response),r]
     context_phase = take(cycle(x),length(x)*responses_per_phase)
-    x = [show_cross,repeated(test,stimuli_per_response)...,r]
+    x = [show_cross,repeated(test,stimuli_per_response),r]
     test_phase = take(cycle(x),length(x)*responses_per_phase)
 
-    addtrial(context_phase,test_phase) do event
-      if iskeydown(event,key"q")
-        record("stream_1",time = time(event))
-      elseif iskeydown(event,key"p")
-        record("stream_2",time = time(event))
-      end
-      
-      if endofpause(event)
-        display(cross)
-      end
-    end
+    addtrial(record_responses,context_phase,test_phase)
 
     anykeybut = response(e -> (iskeydown(e) || endofpause(e)) &&
                          !(iskeydown(e,key"p") || iskeydown(e,key"q")))
