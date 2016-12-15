@@ -2,7 +2,7 @@
 
 1. [Download](https://github.com/haberdashPI/navy_wordstream/archive/master.zip)
    and unzip this project.
-2. Install the 64-bit version of [julia](http://julialang.org/downloads/)
+2. Install the 64-bit version of [julia](https://en.wikibooks.org/wiki/Introducing_Julia/Getting_started)
 3. Run setup.jl
 
 This last step is accomplished by entering the following commands in a terminal.
