@@ -1,11 +1,15 @@
-# NEW NOTES# pitch changes
+#!/usr/bin/env julia
+
+# NEW NOTES
+# pitch changes??
 # more chunks of the same sound
 # maybe introduce to other VTs
-# do we have people respond to the most recent stimulus rather than all 4
+# do we have people respond to the most recent stimulus rather than all 4?
 # or does it split at all
-# do we run as a block
-# allow restarting of expeirment
+# do we run as a block?
+# allow restarting of experiment
 # make shorter? or make sure 1st half has everything
+# maybe block the stimuli?
 
 # NOTES:
 
@@ -48,9 +52,9 @@ response_timeout = 750ms
 trial_pause = 100ms
 n_trials = 40
 n_break_after = 5
-n_repeat_example = 2
-stimuli_per_response = 6
-responses_per_phase = 8
+n_repeat_example = 20
+stimuli_per_response = 3
+responses_per_phase = 16
 normal_s_gap = 41ms
 negative_gap = -100ms
 
@@ -60,15 +64,13 @@ dome = loadsound("sounds/dome.wav")
 drun = loadsound("sounds/drun.wav")
 drum = loadsound("sounds/drum.wav")
 
-# what is the dB difference between the s and sthe dohne?
+# what is the dB difference between the s and the dohne?
 rms(x) = sqrt(mean(x.^2))
 dB_s = -20log10(rms(s_stone) / rms(dohne))
 
 function withgap(a,b,gap)
   sound(mix(attenuate(a,atten_dB+dB_s),[silence(duration(a)+gap); attenuate(b,atten_dB)]))
 end
-
-# maybe block
 
 stimuli = Dict(
   (:normal,   :w2nw) => withgap(s_stone,dohne,normal_s_gap),
@@ -102,8 +104,6 @@ end
 
 contexts = [contexts1; contexts2]
 words = [words1; words2]
-
-sid = (length(ARGS) > 0 ? ARGS[1] : "test_sid")
 
 function syllable(spacing,stimulus,phase)
   sound = stimuli[spacing,stimulus]
@@ -140,17 +140,17 @@ end
 # TODO: allow trials to generate new trials, allowing for a variable number of
 # trials. (figure out the interface for this)
 
-# TODO: create higher level primitives from these lower level primitives
-# e.g. continuous response, adpative 2AFC, and constant stimulus 2AFC tasks.
+# TODO: change API for display so we can show something for some set time period
+# (rather than being clearend with the next display)
+
+# TODO: rewrite Trial.jl so that it is cleaner, probably using
+# a more Reactive style.
+
+# TODO: create a 2AFC adaptive abstraction
 
 # TODO: generate errors for any sounds or image generated during
-# a moment. Allow a 'dynamic' moment and response object that allows
+# a moment. Create a 'dynamic' moment and response object that allows
 # for this.
-
-# TODO: only show the window when we call "run"
-
-# TODO: rather than requiring users to record a pointless
-# event, have the header specified in initialization.
 
 exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.6",
                  skip=n_skip_trials,
