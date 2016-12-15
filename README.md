@@ -28,8 +28,9 @@ Replace `[sid]` with a subject id number. Results will be saved in a `data` subd
 ## Restarting the experiment
 
 If the experiment gets interrupted, the program will report an offset
-number. You can use this number as a second argument to run_wordstream.jl, and
-the experiment will start at the beginning of the trial it was interrupted
+number. This number is also saved on each line of the data recorded during
+the experiment. You can use this number as a second argument to run_wordstream.jl,
+and the experiment will start at the beginning of the trial it was interrupted
 on.
 
 In the below example, the experiment was terminated for participant 1234 at
