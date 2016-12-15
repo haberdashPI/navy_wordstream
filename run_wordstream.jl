@@ -215,7 +215,7 @@ function setup()
     try another practice round, this time a little bit faster.
   """) )
 
-  go_faster = render("Faster!",size=50,duration=500ms,y=0.15)
+  go_faster = render("Faster!",size=50,duration=500ms,y=0.15,priority=1)
   resp = timeout(isresponse,2response_timeout) do time
     record("response_timeout",time=time)
     display(go_faster)
@@ -252,10 +252,11 @@ function setup()
     anykeybut = response(e -> iskeydown(e) && !isresponse(e))
 
     # add a break after every n_break_after trials
-    if trial > 0 && trial % n_break_after == 0
+    if trial > 0 && trial % n_break_after == 0 && trial < n_trials
       break_text = render("You can take a break. Hit"*
-                          " any key when you're ready to resume..."*
-                          "\n$(div(trial,n_break_after)) of "*
+                          " any key (other than P or Q) when you're "*
+                          "ready to resume..."*
+                          "\n$(div(trial,n_break_after)-1) of "*
                           "$(div(n_trials,n_break_after)) breaks.")
 
       message = moment() do t
