@@ -131,17 +131,22 @@ function record_responses(event)
   elseif iskeydown(event,key"p")
     record("stream_2",time = time(event))
   end
-  
-  if endofpause(event)
-    display(cross)
-  end
 end
+
+# TODO: make a better error message for bad responses
+
+isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
+isanykey(e) = iskeydown(e) || endofpause(e)
 
 # TODO: allow trials to generate new trials, allowing for a variable number of
 # trials. (figure out the interface for this)
 
-# TODO: change API for display so we can show something for some set time period
-# (rather than being clearend with the next display)
+# TODO: fix bug so there is no flash
+
+# TODO: change the API for moment to be a macro, so the rendered objects can be
+# precomputed, without having to explicitly do so. (This could lead to confusing
+# undefined variable errors if the rendered object depends on variables
+# within the scope of the function.)
 
 # TODO: rewrite Trial.jl so that it is cleaner, probably using
 # a more Reactive style.
@@ -152,15 +157,11 @@ end
 # a moment. Create a 'dynamic' moment and response object that allows
 # for this.
 
-exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.6",
-                 skip=n_skip_trials,
-                 columns = [:time,:trial,:stimulus,:spacing,:phase]) do
-  addbreak(moment(t -> record("start",time=t)))
+function setup()
+  start = moment(t -> record("start",time=t))
 
-  blank = moment() do t
-    clear()
-    display()
-  end
+  clear = render(colorant"gray")
+  blank = moment(t -> display(clear))
 
   # TODO: show cross could also be a simpler primitive e.g. cross(pause =
   # trial_pause)
@@ -203,11 +204,10 @@ exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.6",
       as part of the sound most of the time, and "P" otherwise.  Respond as
       promptly as you can.""") )
 
-  isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
   stims = repeated(syllable(:normal,:w2nw,"practice"),stimuli_per_response)
   resp = response(isresponse)
   x = [blank,show_cross,stims,resp]
-  addtrial(record_responses,take(cycle(x),length(x)*responses_per_phase) )
+  addtrial(record_responses,take(cycle(x),length(x)*responses_per_phase))
 
   addbreak(instruct("""
   
@@ -215,8 +215,9 @@ exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.6",
     try another practice round, this time a little bit faster.
   """) )
 
-  go_faster = render("Faster!")
+  go_faster = render("Faster!",size=50,duration=500ms,y=0.15)
   resp = timeout(isresponse,2response_timeout) do time
+    record("response_timeout",time=time)
     display(go_faster)
   end
   x = [blank,show_cross,stims,resp]
@@ -229,39 +230,34 @@ exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.6",
     it does flash, please still respond.
   """) )
 
-  anykey = response(e -> iskeydown(e) || endofpause(e))
-  anykeystr = render("Hit any key to start the real experiment...")
-  anykey_message = moment() do t
-    display(anykeystr)
-  end
+  str = render("Hit any key to start the real experiment...")
+  anykey = moment(t -> display(str))
+  addbreak(anykey,response(isanykey))
 
-  addbreak(anykey_message,anykey)
-
-  for i in 1:n_trials
-    context = syllable(contexts[i],words[i],"context")
-    test = syllable(:normal,words[i],"test")
-    # TODO: limit time for response?
-    go_faster = render("Faster!")
-    r = timeout(isresponse,response_timeout) do time
+  for trial in 1:n_trials
+    context = syllable(contexts[trial],words[trial],"context")
+    test = syllable(:normal,words[trial],"test")
+    resp = timeout(isresponse,response_timeout) do time
       record("response_timeout",time=time)
       display(go_faster)
     end
 
-    x = [show_cross,repeated(context,stimuli_per_response),r]
+    x = [show_cross,repeated(context,stimuli_per_response),resp]
     context_phase = take(cycle(x),length(x)*responses_per_phase)
-    x = [show_cross,repeated(test,stimuli_per_response),r]
+    x = [show_cross,repeated(test,stimuli_per_response),resp]
     test_phase = take(cycle(x),length(x)*responses_per_phase)
 
     addtrial(record_responses,context_phase,test_phase)
 
-    anykeybut = response(e -> (iskeydown(e) || endofpause(e)) &&
-                         !(iskeydown(e,key"p") || iskeydown(e,key"q")))
+    anykeybut = response(e -> iskeydown(e) && !isresponse(e))
+
     # add a break after every n_break_after trials
-    if i > 0 && i % n_break_after == 0
+    if trial > 0 && trial % n_break_after == 0
       break_text = render("You can take a break. Hit"*
-                               " any key when you're ready to resume..."*
-                               "\n$(div(i,n_break_after)) of "*
-                               "$(div(n_trials,n_break_after)) breaks.")
+                          " any key when you're ready to resume..."*
+                          "\n$(div(trial,n_break_after)) of "*
+                          "$(div(n_trials,n_break_after)) breaks.")
+
       message = moment() do t
         record("break")
         display(break_text)
@@ -273,6 +269,9 @@ exp = Experiment(condition = "pilot",sid = sid,version = v"0.0.6",
   end
 end
 
+exp = Experiment(setup,condition = "pilot",sid = sid,version = v"0.0.6",
+                 skip=n_skip_trials,
+                 columns = [:time,:trial,:stimulus,:spacing,:phase])
 run(exp)
 
 # prediction: acoustic variations would prevent streaming...
