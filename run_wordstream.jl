@@ -20,36 +20,19 @@
 include("util.jl")
 using Psychotask
 using Lazy: @>
-using ArgParse
 
-s = ArgParseSettings(description = "Run a wordstream experiment.")
-@add_arg_table s begin
-  "sid"
-    help = "Subject id. Trials are randomized per subject."
-    required = true
-    arg_type = String
-  "skip"
-    help = "# of trials to skip. Optionally starts the experiment at a given trial offset."
-    required = false
-    arg_type = Int
-    default = 0
-end
-parsed = parse_args(ARGS,s)
-sid = parsed["sid"]
-n_skip_trials = parsed["skip"]
+sid,trial_skip = @read_args("Run a wordstream experiment")
 
 const ms = 1/1000
 atten_dB = 20
-play(attenuate(ramp(tone(1000,1)),atten_dB))
 
-# when the sid is the same, the random sequence should be the same
+# when the sid is the same, the randomization should be the same
 srand(reinterpret(UInt32,collect(sid)))
 
 # We might be able to change this to ISI now that there
 # is no gap.
 SOA = 672.5ms
 response_timeout = 750ms
-trial_pause = 100ms
 n_trials = 40
 n_break_after = 5
 n_repeat_example = 20
@@ -83,6 +66,8 @@ stimuli = Dict(
   (:negative, :nw2nw) => withgap(s_stone,drun,negative_gap)
 )
 
+response_pause = SOA - duration(stimuli[:normal,:w2nw])
+
 # randomize presentations, but gaurantee that all stimuli
 # are presented in equal quantity within the first and second half
 # of trials
@@ -105,38 +90,29 @@ end
 contexts = [contexts1; contexts2]
 words = [words1; words2]
 
-function syllable(spacing,stimulus,phase)
+function syllable(spacing,stimulus;info...)
   sound = stimuli[spacing,stimulus]
 
   moment(SOA) do t
     play(sound)
-    record("stimulus",time=t,stimulus=stimulus,
-           spacing=spacing,phase=phase)
+    record("stimulus",time=t,stimulus=stimulus,spacing=spacing;info...)
   end
 end
 
-# TODO: maybe make this a standard construct in Psychotask.
-function instruct(str)
-  text = render(str*" (Hit spacebar to continue...)")
-  m = moment() do t
-    record("instructions",time=t)
-    display(text)
+function create_trial(spacing,stimulus;timeout=response_timeout,info...)
+  asyllable = syllable(spacing,stimulus;info...)
+  go_faster = render("Faster!",size=50,duration=500ms,y=0.15,priority=1)
+  await = Psychotask.timeout(isresponse,timeout) do time
+    record("response_timeout",time=time;info...)
+    display(go_faster)
   end
-  [m,response(iskeydown(key":space:"))]
+  
+  x = [show_cross(response_pause),repeated(asyllable,stimuli_per_response),await]
+  take(cycle(x),length(x)*responses_per_phase)
 end
 
-function record_responses(event)
-  if iskeydown(event,key"q")
-    record("stream_1",time = time(event))
-  elseif iskeydown(event,key"p")
-    record("stream_2",time = time(event))
-  end
-end
-
-# TODO: make a better error message for bad responses
-
+# this could be a standard primitive for Trial.jl
 isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
-isanykey(e) = iskeydown(e) || endofpause(e)
 
 # TODO: allow trials to generate new trials, allowing for a variable number of
 # trials. (figure out the interface for this)
@@ -163,12 +139,6 @@ function setup()
   clear = render(colorant"gray")
   blank = moment(t -> display(clear))
 
-  # TODO: show cross could also be a simpler primitive e.g. cross(pause =
-  # trial_pause)
-  # TODO: trials should be able to flatten out nested lists, to simplify syntax
-  cross = render("+")
-  show_cross = moment(trial_pause,t -> display(cross))
-
   addbreak(
     instruct("""
 
@@ -181,9 +151,9 @@ function setup()
       separate from a second, "dohne" sound. See if you can hear the sound
       "stone" change to the sound "dohne" in the following example."""))
 
-  addtrial(blank,show_cross,
-           repeated(syllable(:normal,:w2nw,"example"),n_repeat_example),
-           moment(SOA))
+  addpractice(blank,show_cross(response_pause),
+              repeated(syllable(:normal,:w2nw,phase="example"),n_repeat_example),
+              moment(SOA))
 
   x = stimuli_per_response
   addbreak(
@@ -204,10 +174,10 @@ function setup()
       as part of the sound most of the time, and "P" otherwise.  Respond as
       promptly as you can.""") )
 
-  stims = repeated(syllable(:normal,:w2nw,"practice"),stimuli_per_response)
-  resp = response(isresponse)
-  x = [blank,show_cross,stims,resp]
-  addtrial(record_responses,take(cycle(x),length(x)*responses_per_phase))
+  practice_trial = create_trial(:normal,:w2nw,phase="practice",
+                                timeout=10response_timeout)
+  r = response(key"q" => "stream_1",key"p" => "stream_2",phase="practice")
+  addpractice(r,practice_trial)
 
   addbreak(instruct("""
   
@@ -215,13 +185,10 @@ function setup()
     try another practice round, this time a little bit faster.
   """) )
 
-  go_faster = render("Faster!",size=50,duration=500ms,y=0.15,priority=1)
-  resp = timeout(isresponse,2response_timeout) do time
-    record("response_timeout",time=time)
-    display(go_faster)
-  end
-  x = [blank,show_cross,stims,resp]
-  addtrial(record_responses,take(cycle(x),length(x)*responses_per_phase) )  
+  practice_trial = create_trial(:normal,:w2nw,phase="practice",
+                                timeout=2response_timeout)
+  r = response(key"q" => "stream_1",key"p" => "stream_2",phase="practice")  
+  addpractice(r,practice_trial)
   
   addbreak(instruct("""
 
@@ -232,47 +199,26 @@ function setup()
 
   str = render("Hit any key to start the real experiment...")
   anykey = moment(t -> display(str))
-  addbreak(anykey,response(isanykey))
-
+  addbreak(anykey,await_response(iskeydown))
+  
   for trial in 1:n_trials
-    context = syllable(contexts[trial],words[trial],"context")
-    test = syllable(:normal,words[trial],"test")
-    resp = timeout(isresponse,response_timeout) do time
-      record("response_timeout",time=time)
-      display(go_faster)
-    end
+    context_phase =
+      create_trial(contexts[trial],words[trial],phase="context")
+    record_context =
+      response(key"q" => "stream_1",key"p" => "stream_2",phase="context")
+    
+    test_phase = create_trial(:normal,words[trial],phase="test")
+    record_test =
+      response(key"q" => "stream_1",key"p" => "stream_2",phase="test")
 
-    x = [show_cross,repeated(context,stimuli_per_response),resp]
-    context_phase = take(cycle(x),length(x)*responses_per_phase)
-    x = [show_cross,repeated(test,stimuli_per_response),resp]
-    test_phase = take(cycle(x),length(x)*responses_per_phase)
-
-    addtrial(record_responses,context_phase,test_phase)
-
-    anykeybut = response(e -> iskeydown(e) && !isresponse(e))
-
-    # add a break after every n_break_after trials
-    if trial > 0 && trial % n_break_after == 0 && trial < n_trials
-      break_text = render("You can take a break. Hit"*
-                          " any key (other than P or Q) when you're "*
-                          "ready to resume..."*
-                          "\n$(div(trial,n_break_after)-1) of "*
-                          "$(div(n_trials,n_break_after)) breaks.")
-
-      message = moment() do t
-        record("break")
-        display(break_text)
-      end
-
-      addbreak(message,anykeybut)
-    end
-
+    addtrial(record_context,context_phase,record_test,test_phase)
   end
 end
 
-exp = Experiment(setup,condition = "pilot",sid = sid,version = v"0.0.6",
-                 skip=n_skip_trials,
-                 columns = [:time,:trial,:stimulus,:spacing,:phase])
+exp = Experiment(setup,condition = "pilot",sid = sid,version = v"0.1.0",
+                 skip=trial_skip,
+                 columns = [:time,:stimulus,:spacing,:phase])
+play(attenuate(ramp(tone(1000,1)),atten_dB))
 run(exp)
 
 # prediction: acoustic variations would prevent streaming...
