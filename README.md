@@ -1,3 +1,12 @@
+# About
+
+This is a work-in-progress experiment looking at
+[auditory streaming](http://www.nature.com/nrn/journal/v14/n10/fig_tab/nrn3565_F3.html)
+in word and non-word utterances, and the role recent acoustical context may (or
+may not) play for these stimuli. The work builds on the findings in:
+
+Billig, A. J., Davis, M. H., Deeks, J. M., Monstrey, J., & Carlyon, R. P. (2013). Lexical Influences on Auditory Streaming. Current Biology, 23(16), 1585–1589. https://doi.org/10.1016/j.cub.2013.06.042
+
 # Installation
 
 1. [Download](https://github.com/haberdashPI/navy_wordstream/archive/master.zip)
