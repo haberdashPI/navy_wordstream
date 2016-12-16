@@ -68,9 +68,8 @@ stimuli = Dict(
 
 response_pause = SOA - duration(stimuli[:normal,:w2nw])
 
-# randomize presentations, but gaurantee that all stimuli
-# are presented in equal quantity within the first and second half
-# of trials
+# randomize presentations, but gaurantee that all stimuli are presented in equal
+# quantity within the first and second half of trials
 contexts1,words1 = @> keys(stimuli) begin
   cycle
   take(div(n_trials,2))
@@ -90,6 +89,9 @@ end
 contexts = [contexts1; contexts2]
 words = [words1; words2]
 
+isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
+
+# presents a singl syllable
 function syllable(spacing,stimulus;info...)
   sound = stimuli[spacing,stimulus]
 
@@ -99,39 +101,22 @@ function syllable(spacing,stimulus;info...)
   end
 end
 
-function create_trial(spacing,stimulus;timeout=response_timeout,info...)
+# runs an entire trial
+function create_trial(spacing,stimulus;limit=response_timeout,info...)
   asyllable = syllable(spacing,stimulus;info...)
+
   go_faster = render("Faster!",size=50,duration=500ms,y=0.15,priority=1)
-  await = Psychotask.timeout(isresponse,timeout) do time
+  await = timeout(isresponse,limit) do time
     record("response_timeout",time=time;info...)
     display(go_faster)
   end
-  
-  x = [show_cross(response_pause),repeated(asyllable,stimuli_per_response),await]
-  take(cycle(x),length(x)*responses_per_phase)
+
+  resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
+
+  x = [resp,show_cross(response_pause),
+       repeated(asyllable,stimuli_per_response),await]
+  repeat(x,outer=responses_per_phase)
 end
-
-# this could be a standard primitive for Trial.jl
-isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
-
-# TODO: allow trials to generate new trials, allowing for a variable number of
-# trials. (figure out the interface for this)
-
-# TODO: fix bug so there is no flash
-
-# TODO: change the API for moment to be a macro, so the rendered objects can be
-# precomputed, without having to explicitly do so. (This could lead to confusing
-# undefined variable errors if the rendered object depends on variables
-# within the scope of the function.)
-
-# TODO: rewrite Trial.jl so that it is cleaner, probably using
-# a more Reactive style.
-
-# TODO: create a 2AFC adaptive abstraction
-
-# TODO: generate errors for any sounds or image generated during
-# a moment. Create a 'dynamic' moment and response object that allows
-# for this.
 
 function setup()
   start = moment(t -> record("start",time=t))
@@ -174,10 +159,8 @@ function setup()
       as part of the sound most of the time, and "P" otherwise.  Respond as
       promptly as you can.""") )
 
-  practice_trial = create_trial(:normal,:w2nw,phase="practice",
-                                timeout=10response_timeout)
-  r = response(key"q" => "stream_1",key"p" => "stream_2",phase="practice")
-  addpractice(r,practice_trial)
+  addpractice(create_trial(:normal,:w2nw,phase="practice",
+                           limit=10response_timeout))
 
   addbreak(instruct("""
   
@@ -185,10 +168,8 @@ function setup()
     try another practice round, this time a little bit faster.
   """) )
 
-  practice_trial = create_trial(:normal,:w2nw,phase="practice",
-                                timeout=2response_timeout)
-  r = response(key"q" => "stream_1",key"p" => "stream_2",phase="practice")  
-  addpractice(r,practice_trial)
+  addpractice(create_trial(:normal,:w2nw,phase="practice",
+                           limit=2response_timeout))
   
   addbreak(instruct("""
 
@@ -204,14 +185,8 @@ function setup()
   for trial in 1:n_trials
     context_phase =
       create_trial(contexts[trial],words[trial],phase="context")
-    record_context =
-      response(key"q" => "stream_1",key"p" => "stream_2",phase="context")
-    
     test_phase = create_trial(:normal,words[trial],phase="test")
-    record_test =
-      response(key"q" => "stream_1",key"p" => "stream_2",phase="test")
-
-    addtrial(record_context,context_phase,record_test,test_phase)
+    addtrial(context_phase,test_phase)
   end
 end
 
