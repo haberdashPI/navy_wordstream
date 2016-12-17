@@ -21,7 +21,7 @@ include("util.jl")
 using Psychotask
 using Lazy: @>
 
-sid,trial_skip = @read_args("Run a wordstream experiment")
+sid,trial_skip = @read_args("Runs a wordstream experiment")
 
 const ms = 1/1000
 atten_dB = 20
@@ -91,7 +91,7 @@ words = [words1; words2]
 
 isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
 
-# presents a singl syllable
+# presents a single syllable
 function syllable(spacing,stimulus;info...)
   sound = stimuli[spacing,stimulus]
 
@@ -183,6 +183,8 @@ function setup()
   addbreak(anykey,await_response(iskeydown))
   
   for trial in 1:n_trials
+    addbreak_every(n_break_after,n_trials)
+
     context_phase =
       create_trial(contexts[trial],words[trial],phase="context")
     test_phase = create_trial(:normal,words[trial],phase="test")
