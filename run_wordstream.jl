@@ -21,7 +21,7 @@ include("util.jl")
 using Psychotask
 using Lazy: @>
 
-version = v"0.1.0"
+version = v"0.2.0"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 
 const ms = 1/1000
@@ -33,14 +33,14 @@ srand(reinterpret(UInt32,collect(sid)))
 # We might be able to change this to ISI now that there
 # is no gap.
 SOA = 672.5ms
-response_timeout = 750ms
-n_trials = 40
-n_break_after = 5
+response_spacing = 250ms
+n_trials = 60
+n_break_after = 10
 n_repeat_example = 20
-stimuli_per_response = 3
-responses_per_phase = 16
+stimuli_per_response = 2
+responses_per_phase = 15
 normal_s_gap = 41ms
-negative_gap = -100ms
+negative_s_gap = -100ms
 
 s_stone = loadsound("sounds/s_stone.wav")
 dohne = loadsound("sounds/dohne.wav")
@@ -58,16 +58,15 @@ end
 
 stimuli = Dict(
   (:normal,   :w2nw) => withgap(s_stone,dohne,normal_s_gap),
-  (:negative, :w2nw) => withgap(s_stone,dohne,negative_gap),
+  (:negative, :w2nw) => withgap(s_stone,dohne,negative_s_gap),
   (:normal,   :nw2w) => withgap(s_stone,dome,normal_s_gap),
-  (:negative, :nw2w) => withgap(s_stone,dome,negative_gap),
+  (:negative, :nw2w) => withgap(s_stone,dome,negative_s_gap),
   (:normal,   :w2w) => withgap(s_stone,drum,normal_s_gap),
-  (:negative, :w2w) => withgap(s_stone,drum,negative_gap),
+  (:negative, :w2w) => withgap(s_stone,drum,negative_s_gap),
   (:normal,   :nw2nw) => withgap(s_stone,drun,normal_s_gap),
-  (:negative, :nw2nw) => withgap(s_stone,drun,negative_gap)
+  (:negative, :nw2nw) => withgap(s_stone,drun,negative_s_gap)
 )
 
-response_pause = SOA - duration(stimuli[:normal,:w2nw])
 
 # randomize presentations, but gaurantee that all stimuli are presented in equal
 # quantity within the first and second half of trials
@@ -96,26 +95,43 @@ isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
 function syllable(spacing,stimulus;info...)
   sound = stimuli[spacing,stimulus]
 
-  moment(SOA) do t
+  x = moment() do t
     play(sound)
     record("stimulus",time=t,stimulus=stimulus,spacing=spacing;info...)
   end
+  x * moment(SOA)
 end
 
-# runs an entire trial
-function create_trial(spacing,stimulus;limit=response_timeout,info...)
+# in a practice trial, the listener is given a prompt if they're too slow
+function practice_trial(spacing,stimulus,response_spacing;info...)
   asyllable = syllable(spacing,stimulus;info...)
+  resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
 
   go_faster = render("Faster!",size=50,duration=500ms,y=0.15,priority=1)
-  await = timeout(isresponse,limit) do time
+  waitlen = SOA*stimuli_per_response+response_spacing
+  await = timeout(isresponse,waitlen) do time
     record("response_timeout",time=time;info...)
     display(go_faster)
   end
 
-  resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
+  x = [resp,show_cross(duration=SOA*stimuli_per_response),
+       reduce(*,repeated(asyllable,stimuli_per_response)),
+       moment(0) * await,
+       moment(waitlen)]
+  repeat(x,outer=responses_per_phase)
+end
 
-  x = [resp,show_cross(response_pause),
-       repeated(asyllable,stimuli_per_response),await]
+# in the real trials the presentations are continuous and do not wait for
+# responses
+function real_trial(spacing,stimulus;info...)
+  clear = render(colorant"gray")
+  blank = moment(t -> display(clear))
+  resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
+  asyllable = syllable(spacing,stimulus;info...)
+
+  x = [resp,show_cross(duration=SOA*stimuli_per_response),
+       reduce(*,repeated(asyllable,stimuli_per_response)),
+       moment(SOA*stimuli_per_response+response_spacing)]
   repeat(x,outer=responses_per_phase)
 end
 
@@ -137,9 +153,9 @@ function setup()
       separate from a second, "dohne" sound. See if you can hear the sound
       "stone" change to the sound "dohne" in the following example."""))
 
-  addpractice(blank,show_cross(response_pause),
-              repeated(syllable(:normal,:w2nw,phase="example"),n_repeat_example),
-              moment(SOA))
+  addpractice(blank,show_cross(response_spacing),
+              repeated(syllable(:normal,:w2nw,phase="example"),
+                       n_repeat_example))
 
   x = stimuli_per_response
   addbreak(
@@ -155,13 +171,11 @@ function setup()
       other changes to the sound that you hear; please ignore them."""),
     instruct("""
 
-      After every $x sounds, we want you to indicate what you heard most
-      often. Let's practice a bit.  Use "Q" to indicate that you heard the "s"
-      as part of the sound most of the time, and "P" otherwise.  Respond as
-      promptly as you can.""") )
+      After every sound, we want you to indicate what you heard. Let's practice
+      a bit.  Use "Q" to indicate that you heard the "s" as part of the sound
+      and "P" otherwise.  Respond as promptly as you can."""))
 
-  addpractice(create_trial(:normal,:w2nw,phase="practice",
-                           limit=10response_timeout))
+  addpractice(practice_trial(:normal,:w2nw,10response_spacing,phase="practice"))
 
   addbreak(instruct("""
   
@@ -169,8 +183,7 @@ function setup()
     try another practice round, this time a little bit faster.
   """) )
 
-  addpractice(create_trial(:normal,:w2nw,phase="practice",
-                           limit=2response_timeout))
+  addpractice(practice_trial(:normal,:w2nw,2response_spacing,phase="practice"))
   
   addbreak(instruct("""
 
@@ -186,9 +199,8 @@ function setup()
   for trial in 1:n_trials
     addbreak_every(n_break_after,n_trials)
 
-    context_phase =
-      create_trial(contexts[trial],words[trial],phase="context")
-    test_phase = create_trial(:normal,words[trial],phase="test")
+    context_phase = real_trial(contexts[trial],words[trial],phase="context")
+    test_phase = real_trial(:normal,words[trial],phase="test")
     addtrial(context_phase,test_phase)
   end
 end
