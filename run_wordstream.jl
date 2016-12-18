@@ -21,7 +21,8 @@ include("util.jl")
 using Psychotask
 using Lazy: @>
 
-sid,trial_skip = @read_args("Runs a wordstream experiment")
+version = v"0.1.0"
+sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 
 const ms = 1/1000
 atten_dB = 20
@@ -192,7 +193,7 @@ function setup()
   end
 end
 
-exp = Experiment(setup,condition = "pilot",sid = sid,version = v"0.1.0",
+exp = Experiment(setup,condition = "pilot",sid = sid,version = version,
                  skip=trial_skip,
                  columns = [:time,:stimulus,:spacing,:phase])
 play(attenuate(ramp(tone(1000,1)),atten_dB))
