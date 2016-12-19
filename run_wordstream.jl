@@ -38,7 +38,7 @@ response_spacing = 200ms
 n_trials = 60
 n_break_after = 10
 n_repeat_example = 20
-stimuli_per_response = 2
+stimuli_per_response = 3
 responses_per_phase = 15
 normal_s_gap = 41ms
 negative_s_gap = -100ms
@@ -171,9 +171,10 @@ function setup()
       other changes to the sound that you hear; please ignore them."""),
     instruct("""
 
-      After every sound, we want you to indicate what you heard. Let's practice
-      a bit.  Use "Q" to indicate that you heard the "s" as part of the sound
-      and "P" otherwise.  Respond as promptly as you can."""))
+      After several sounds, we want you to indicate what you heard. Let's
+      practice a bit.  Use "Q" to indicate that you heard the "s" as part of the
+      sound most of the time and "P" otherwise.  Respond as promptly as you
+      can."""))
 
   addpractice(practice_trial(:normal,:w2nw,10response_spacing,phase="practice"))
 
@@ -187,10 +188,9 @@ function setup()
   
   addbreak(instruct("""
 
-    In the real experiment, your time to respond will be even more limited. 
-    Please try to respond before you see the "Faster!" flash, but even if
-    it does flash, please still respond.
-  """) )
+    In the real experiment, your time to respond will be even more limited. Try
+    to respond before the next trial begins, but even if you don't please still
+    respond.""") )
 
   str = render("Hit any key to start the real experiment...")
   anykey = moment(t -> display(str))
