@@ -33,7 +33,8 @@ srand(reinterpret(UInt32,collect(sid)))
 # We might be able to change this to ISI now that there
 # is no gap.
 SOA = 672.5ms
-response_spacing = 250ms
+practice_spacing = 150ms
+response_spacing = 200ms
 n_trials = 60
 n_break_after = 10
 n_repeat_example = 20
@@ -95,29 +96,28 @@ isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
 function syllable(spacing,stimulus;info...)
   sound = stimuli[spacing,stimulus]
 
-  x = moment() do t
+  moment() do t
     play(sound)
     record("stimulus",time=t,stimulus=stimulus,spacing=spacing;info...)
-  end
-  x * moment(SOA)
+  end * moment(SOA)
 end
 
 # in a practice trial, the listener is given a prompt if they're too slow
-function practice_trial(spacing,stimulus,response_spacing;info...)
+function practice_trial(spacing,stimulus,limit;info...)
   asyllable = syllable(spacing,stimulus;info...)
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
 
   go_faster = render("Faster!",size=50,duration=500ms,y=0.15,priority=1)
-  waitlen = SOA*stimuli_per_response+response_spacing
-  await = timeout(isresponse,waitlen) do time
+  waitlen = SOA*stimuli_per_response+limit
+  await = timeout(isresponse,waitlen;delta_update=false) do time
     record("response_timeout",time=time;info...)
     display(go_faster)
   end
 
-  x = [resp,show_cross(duration=SOA*stimuli_per_response),
-       reduce(*,repeated(asyllable,stimuli_per_response)),
-       moment(0) * await,
-       moment(waitlen)]
+  x = [moment(practice_spacing),resp,show_cross(),
+       prod(repeated(asyllable,stimuli_per_response)),
+       await,
+       moment(SOA*stimuli_per_response+response_spacing)]
   repeat(x,outer=responses_per_phase)
 end
 
@@ -129,8 +129,8 @@ function real_trial(spacing,stimulus;info...)
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
   asyllable = syllable(spacing,stimulus;info...)
 
-  x = [resp,show_cross(duration=SOA*stimuli_per_response),
-       reduce(*,repeated(asyllable,stimuli_per_response)),
+  x = [resp,show_cross(),
+       prod(repeated(asyllable,stimuli_per_response)),
        moment(SOA*stimuli_per_response+response_spacing)]
   repeat(x,outer=responses_per_phase)
 end
