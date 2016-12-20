@@ -21,7 +21,7 @@ include("util.jl")
 using Psychotask
 using Lazy: @>
 
-version = v"0.2.0"
+version = v"0.2.1"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 
 const ms = 1/1000
@@ -43,11 +43,11 @@ responses_per_phase = 15
 normal_s_gap = 41ms
 negative_s_gap = -100ms
 
-s_stone = loadsound("sounds/s_stone.wav")
-dohne = loadsound("sounds/dohne.wav")
-dome = loadsound("sounds/dome.wav")
-drun = loadsound("sounds/drun.wav")
-drum = loadsound("sounds/drum.wav")
+s_stone = load("sounds/s_stone.wav")
+dohne = load("sounds/dohne.wav")
+dome = load("sounds/dome.wav")
+drun = load("sounds/drun.wav")
+drum = load("sounds/drum.wav")
 
 # what is the dB difference between the s and the dohne?
 rms(x) = sqrt(mean(x.^2))
@@ -96,15 +96,15 @@ isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
 function syllable(spacing,stimulus;info...)
   sound = stimuli[spacing,stimulus]
 
-  moment() do t
+  [moment() do t
     play(sound)
     record("stimulus",time=t,stimulus=stimulus,spacing=spacing;info...)
-  end * moment(SOA)
+  end,moment(SOA)]
 end
 
 # in a practice trial, the listener is given a prompt if they're too slow
 function practice_trial(spacing,stimulus,limit;info...)
-  asyllable = syllable(spacing,stimulus;info...)
+  asyllable = prod(syllable(spacing,stimulus;info...))
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
 
   go_faster = render("Faster!",size=50,duration=500ms,y=0.15,priority=1)
@@ -127,7 +127,7 @@ function real_trial(spacing,stimulus;info...)
   clear = render(colorant"gray")
   blank = moment(t -> display(clear))
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
-  asyllable = syllable(spacing,stimulus;info...)
+  asyllable = prod(syllable(spacing,stimulus;info...))
 
   x = [resp,show_cross(),
        prod(repeated(asyllable,stimuli_per_response)),
@@ -173,8 +173,8 @@ function setup()
 
       After several sounds, we want you to indicate what you heard. Let's
       practice a bit.  Use "Q" to indicate that you heard the "s" as part of the
-      sound most of the time and "P" otherwise.  Respond as promptly as you
-      can."""))
+      sound all of the time and "P" if you heard the "s" as separate at any
+      point. Respond as promptly as you can."""))
 
   addpractice(practice_trial(:normal,:w2nw,10response_spacing,phase="practice"))
 
