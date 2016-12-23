@@ -36,5 +36,5 @@ console verison by typing `julia run_wordstream.jl -h`.
 If the experiment gets interrupted, the program will report an offset
 number. This number is also saved on each line of the data recorded during
 the experiment. You can use this number to run_wordstream.jl starting from
-somewhere in the middle of the expeirment.
+somewhere in the middle of the experiment.
 
