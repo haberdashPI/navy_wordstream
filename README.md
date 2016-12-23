@@ -24,10 +24,10 @@ One way to do this is as follows:
 If you installed Juno (see above) just run `run_wordstream.jl` in Juno.  Make
 sure you have the console open (Julia > Open Console), as you will be prompted
 to enter a number of experimental parameters. Also note that important warnings
-and information about the experiment will be written to console.
+and information about the experiment will be written to the console.
 
-Alternatively, if you have julia setup in your `PATH`, you can run it from the
-console by typing `julia run_wordstream.jl`. On mac (or unix) this can be
+Alternatively, if you have julia setup in your `PATH`, you can run it from a
+terminal by typing `julia run_wordstream.jl`. On mac (or unix) this can be
 shortened to `./run_wordstream.jl`. You can get help about how to use the
 console verison by typing `julia run_wordstream.jl -h`. 
 
