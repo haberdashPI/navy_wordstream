@@ -21,7 +21,7 @@ include("util.jl")
 using Psychotask
 using Lazy: @>
 
-version = v"0.2.1"
+version = v"0.2.2"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 
 const ms = 1/1000
@@ -107,7 +107,7 @@ function practice_trial(spacing,stimulus,limit;info...)
   asyllable = prod(syllable(spacing,stimulus;info...))
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
 
-  go_faster = render("Faster!",size=50,duration=500ms,y=0.15,priority=1)
+  go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
   waitlen = SOA*stimuli_per_response+limit
   await = timeout(isresponse,waitlen;delta_update=false) do time
     record("response_timeout",time=time;info...)
@@ -124,7 +124,7 @@ end
 # in the real trials the presentations are continuous and do not wait for
 # responses
 function real_trial(spacing,stimulus;info...)
-  clear = render(colorant"gray")
+  clear = visual(colorant"gray")
   blank = moment(t -> display(clear))
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
   asyllable = prod(syllable(spacing,stimulus;info...))
@@ -135,10 +135,13 @@ function real_trial(spacing,stimulus;info...)
   repeat(x,outer=responses_per_phase)
 end
 
-function setup()
+exp = Experiment(condition = "pilot",sid = sid,version = version,
+                 skip=trial_skip,columns = [:time,:stimulus,:spacing,:phase])
+
+setup(exp) do
   start = moment(t -> record("start",time=t))
 
-  clear = render(colorant"gray")
+  clear = visual(colorant"gray")
   blank = moment(t -> display(clear))
 
   addbreak(
@@ -192,7 +195,7 @@ function setup()
     to respond before the next trial begins, but even if you don't please still
     respond.""") )
 
-  str = render("Hit any key to start the real experiment...")
+  str = visual("Hit any key to start the real experiment...")
   anykey = moment(t -> display(str))
   addbreak(anykey,await_response(iskeydown))
   
@@ -205,10 +208,7 @@ function setup()
   end
 end
 
-exp = Experiment(setup,condition = "pilot",sid = sid,version = version,
-                 skip=trial_skip,
-                 columns = [:time,:stimulus,:spacing,:phase])
-play(attenuate(ramp(tone(1000,1)),atten_dB))
+play(attenuate(ramp(tone(1000,1)),atten_dB),false)
 run(exp)
 
 # prediction: acoustic variations would prevent streaming...
