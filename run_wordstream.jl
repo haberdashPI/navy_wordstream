@@ -18,7 +18,7 @@
 # make relationship between EEG and beahvioral data difficult to interpret.
 
 include("util.jl")
-using Psychotask
+using Weber
 using Lazy: @>
 
 version = v"0.2.2"
@@ -35,7 +35,7 @@ srand(reinterpret(UInt32,collect(sid)))
 SOA = 672.5ms
 practice_spacing = 150ms
 response_spacing = 200ms
-n_trials = 60
+n_trials = 64 # needs to be a multiple of 8 (the number of stimuli)
 n_break_after = 10
 n_repeat_example = 20
 stimuli_per_response = 3
@@ -71,6 +71,9 @@ stimuli = Dict(
 
 # randomize presentations, but gaurantee that all stimuli are presented in equal
 # quantity within the first and second half of trials
+contexts1,words1 = unzip(shuffle(collect(take(cycle(keys(stimuli)),div(n_trials,2)))))
+
+# this repeats some words and contexts more frequenlty FIX!!!
 contexts1,words1 = @> keys(stimuli) begin
   cycle
   take(div(n_trials,2))
@@ -98,24 +101,24 @@ function syllable(spacing,stimulus;info...)
 
   [moment() do t
     play(sound)
-    record("stimulus",time=t,stimulus=stimulus,spacing=spacing;info...)
+    record("stimulus",stimulus=stimulus,spacing=spacing;info...)
   end,moment(SOA)]
 end
 
 # in a practice trial, the listener is given a prompt if they're too slow
 function practice_trial(spacing,stimulus,limit;info...)
-  asyllable = prod(syllable(spacing,stimulus;info...))
+  asyllable = syllable(spacing,stimulus;info...)
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
 
   go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
   waitlen = SOA*stimuli_per_response+limit
   await = timeout(isresponse,waitlen;delta_update=false) do time
-    record("response_timeout",time=time;info...)
+    record("response_timeout";info...)
     display(go_faster)
   end
 
   x = [moment(practice_spacing),resp,show_cross(),
-       prod(repeated(asyllable,stimuli_per_response)),
+       moment(repeated(asyllable,stimuli_per_response)),
        await,
        moment(SOA*stimuli_per_response+response_spacing)]
   repeat(x,outer=responses_per_phase)
@@ -127,19 +130,19 @@ function real_trial(spacing,stimulus;info...)
   clear = visual(colorant"gray")
   blank = moment(t -> display(clear))
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
-  asyllable = prod(syllable(spacing,stimulus;info...))
+  asyllable = syllable(spacing,stimulus;info...)
 
   x = [resp,show_cross(),
-       prod(repeated(asyllable,stimuli_per_response)),
+       moment(repeated(asyllable,stimuli_per_response)),
        moment(SOA*stimuli_per_response+response_spacing)]
   repeat(x,outer=responses_per_phase)
 end
 
 exp = Experiment(condition = "pilot",sid = sid,version = version,
-                 skip=trial_skip,columns = [:time,:stimulus,:spacing,:phase])
+                 skip=trial_skip,columns = [:stimulus,:spacing,:phase])
 
 setup(exp) do
-  start = moment(t -> record("start",time=t))
+  start = moment(t -> record("start"))
 
   clear = visual(colorant"gray")
   blank = moment(t -> display(clear))
@@ -156,7 +159,7 @@ setup(exp) do
       separate from a second, "dohne" sound. See if you can hear the sound
       "stone" change to the sound "dohne" in the following example."""))
 
-  addpractice(blank,show_cross(response_spacing),
+  addpractice(blank,show_cross(),
               repeated(syllable(:normal,:w2nw,phase="example"),
                        n_repeat_example))
 
@@ -182,13 +185,13 @@ setup(exp) do
   addpractice(practice_trial(:normal,:w2nw,10response_spacing,phase="practice"))
 
   addbreak(instruct("""
-  
+
     In the real experiment, your time to respond will be limited. Let's
     try another practice round, this time a little bit faster.
   """) )
 
   addpractice(practice_trial(:normal,:w2nw,2response_spacing,phase="practice"))
-  
+
   addbreak(instruct("""
 
     In the real experiment, your time to respond will be even more limited. Try
@@ -198,7 +201,7 @@ setup(exp) do
   str = visual("Hit any key to start the real experiment...")
   anykey = moment(t -> display(str))
   addbreak(anykey,await_response(iskeydown))
-  
+
   for trial in 1:n_trials
     addbreak_every(n_break_after,n_trials)
 
@@ -208,7 +211,7 @@ setup(exp) do
   end
 end
 
-play(attenuate(ramp(tone(1000,1)),atten_dB),false)
+play(sound(attenuate(ramp(tone(1000,1)),atten_dB)),wait=true)
 run(exp)
 
 # prediction: acoustic variations would prevent streaming...
