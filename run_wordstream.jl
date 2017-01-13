@@ -28,7 +28,7 @@ const ms = 1/1000
 atten_dB = 20
 
 # when the sid is the same, the randomization should be the same
-randomize_by(sid)
+srand(reinterpret(UInt32,collect(sid)))
 
 # We might be able to change this to ISI now that there
 # is no gap.
@@ -112,15 +112,15 @@ function practice_trial(spacing,stimulus,limit;info...)
 
   go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
   waitlen = SOA*stimuli_per_response+limit
-  await = timeout(isresponse,waitlen;delta_update=false) do time
+  min_wait = SOA*stimuli_per_response+response_spacing
+  await = timeout(isresponse,waitlen,atleast=min_wait) do time
     record("response_timeout";info...)
     display(go_faster)
   end
 
   x = [moment(practice_spacing),resp,show_cross(),
        moment(repeated(asyllable,stimuli_per_response)),
-       await,
-       moment(SOA*stimuli_per_response+response_spacing)]
+       await]
   repeat(x,outer=responses_per_phase)
 end
 
@@ -205,13 +205,19 @@ setup(exp) do
   for trial in 1:n_trials
     addbreak_every(n_break_after,n_trials)
 
-    context_phase = real_trial(contexts[trial],words[trial],phase="context")
-    test_phase = real_trial(:normal,words[trial],phase="test")
+    context_phase = real_trial(contexts[trial],words[trial],
+                               phase="context",
+                               spacing=contexts[trial])
+
+    test_phase = real_trial(:normal,words[trial],
+                            phase="test",
+                            spacing=contexts[trial])
+
     addtrial(context_phase,test_phase)
   end
 end
 
-play(sound(attenuate(ramp(tone(1000,1)),atten_dB)),wait=true)
+play(attenuate(ramp(tone(1000,1)),atten_dB),wait=true)
 run(exp)
 
 # prediction: acoustic variations would prevent streaming...
