@@ -219,5 +219,3 @@ end
 
 play(attenuate(ramp(tone(1000,1)),atten_dB),wait=true)
 run(exp)
-
-# prediction: acoustic variations would prevent streaming...
