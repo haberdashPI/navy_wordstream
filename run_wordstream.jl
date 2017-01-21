@@ -1,6 +1,21 @@
 #!/usr/bin/env julia
 
-# NEW NOTES
+# NOTES
+#===============================================================================
+
+What is up with 0002 and 0004? why aren't the negative sounds working?
+
+0004 - did not understand the task, interpreted Q as
+0002 - anna is not sure, thinks maybe they were different words.
+
+show a message for word transitions
+shorter session? running 90 minutes right now, is rough for participants
+
+go through several examples. How do we handle the negative examples?
+
+===============================================================================#
+
+# NOTES - from 0.2.2
 # pitch changes??
 # more chunks of the same sound
 # maybe introduce to other VTs
@@ -11,8 +26,7 @@
 # make shorter? or make sure 1st half has everything
 # maybe block the stimuli?
 
-# NOTES:
-
+# NOTES - from older
 # concern that there is a delay in when you hear a stream switch and when you
 # indicate that switch , sometimes occuring on the *next* stimulus. Might
 # make relationship between EEG and beahvioral data difficult to interpret.
@@ -35,7 +49,7 @@ srand(reinterpret(UInt32,collect(sid)))
 SOA = 672.5ms
 practice_spacing = 150ms
 response_spacing = 200ms
-n_trials = 64 # needs to be a multiple of 8 (the number of stimuli)
+n_trials = 64 # n/2 needs to be a multiple of 8 (the number of stimuli)
 n_break_after = 10
 n_repeat_example = 20
 stimuli_per_response = 3
@@ -71,7 +85,6 @@ stimuli = Dict(
 
 # randomize presentations, but gaurantee that all stimuli are presented in equal
 # quantity within the first and second half of trials
-contexts1,words1 = unzip(shuffle(collect(take(cycle(keys(stimuli)),div(n_trials,2)))))
 
 # this repeats some words and contexts more frequenlty FIX!!!
 contexts1,words1 = @> keys(stimuli) begin
