@@ -48,7 +48,7 @@ sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 const ms = 1/1000
 
 # when the sid is the same, the randomization should be the same
-srand(reinterpret(UInt32,collect(sid)))
+randomize_by(sid)
 
 # We might be able to change this to ISI now that there
 # is no gap.
