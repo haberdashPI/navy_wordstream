@@ -34,12 +34,13 @@ go through several examples. How do we handle the negative examples?
 include("util.jl")
 using Weber
 using Lazy: @>
+include("calibrate.jl")
+setup_sound(buffer_size=buffer_size)
 
-version = v"0.2.2"
+version = v"0.2.3"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 
 const ms = 1/1000
-atten_dB = 20
 
 # when the sid is the same, the randomization should be the same
 srand(reinterpret(UInt32,collect(sid)))
@@ -152,6 +153,7 @@ function real_trial(spacing,stimulus;info...)
 end
 
 exp = Experiment(condition = "pilot",sid = sid,version = version,
+                 moment_resolution = moment_resolution,
                  skip=trial_skip,columns = [:stimulus,:spacing,:phase])
 
 setup(exp) do
