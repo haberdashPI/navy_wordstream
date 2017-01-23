@@ -5,13 +5,18 @@
 
 What is up with 0002 and 0004? why aren't the negative sounds working?
 
-0004 - did not understand the task, interpreted Q as
-0002 - anna is not sure, thinks maybe they were different words.
+0004 - did not understand the task, interpreted split as based on the number of
+syllables
+
+0002 - anna is not sure, thinks maybe negative were different words (but
+guessing it was a confusiong aobut which were new and which were "old" words)
 
 show a message for word transitions
 shorter session? running 90 minutes right now, is rough for participants
 
-go through several examples. How do we handle the negative examples?
+go through several examples. How would we handle the negative examples?
+
+maybe have some limit for how long we continue without any response?
 
 ===============================================================================#
 
