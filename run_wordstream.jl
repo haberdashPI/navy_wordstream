@@ -55,13 +55,17 @@ randomize_by(sid)
 SOA = 672.5ms
 practice_spacing = 150ms
 response_spacing = 200ms
-n_trials = 64 # n/2 needs to be a multiple of 8 (the number of stimuli)
+n_trials = 48 # n/2 needs to be a multiple of 8 (the number of stimuli)
 n_break_after = 10
 n_repeat_example = 20
 stimuli_per_response = 3
 responses_per_phase = 15
 normal_s_gap = 41ms
-negative_s_gap = -100ms
+negative_s_gap = -41ms
+
+if n_trials % 16 != 0
+  error("n_trials/2 must be a multiple of 8")
+end
 
 s_stone = load("sounds/s_stone.wav")
 dohne = load("sounds/dohne.wav")
@@ -88,29 +92,32 @@ stimuli = Dict(
   (:negative, :nw2nw) => withgap(s_stone,drun,negative_s_gap)
 )
 
+stimulus_description = Dict(
+  :w2nw => """
+In what follows you will be presented the sound "stone".
 
-# randomize presentations, but gaurantee that all stimuli are presented in equal
-# quantity within the first and second half of trials
+If you hear "stone" press "Q". If you hear "s" - "dohne" press "P".
+""",
+  :nw2w => """
+In what follows you will be presented the sound "stome".
 
-# this repeats some words and contexts more frequenlty FIX!!!
-contexts1,words1 = @> keys(stimuli) begin
-  cycle
-  take(div(n_trials,2))
-  collect
-  shuffle
-  unzip
-end
+If you hear "stome" press "Q". If you hear "s" - "dome" press "P".
+""",
+  :w2w => """
+In what follows you will be presented the sound "strum".
 
-contexts2,words2 = @> keys(stimuli) begin
-  cycle
-  take(n_trials - div(n_trials,2))
-  collect
-  shuffle
-  unzip
-end
+If you hear "strum" press "Q". If you hear "s" - "drum" press "P".
+""",
+  :nw2nw => """
+In what follows you will be presented the sound "strun".
 
-contexts = [contexts1; contexts2]
-words = [words1; words2]
+If you hear "strun" press "Q". If you hear "s" - "drun" press "P".
+"""
+)
+
+# block all words in first, and then second half
+order = [keys(stimuli) |> collect |> shuffle,
+         keys(stimuli) |> collect |> shuffle]
 
 isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
 
@@ -222,18 +229,19 @@ setup(exp) do
   anykey = moment(t -> display(str))
   addbreak(anykey,await_response(iskeydown))
 
-  for trial in 1:n_trials
-    addbreak_every(n_break_after,n_trials)
+  n_blocks = length(keys(stimuli))
+  n_repeats = div(n_trials,2length(keys(stimuli)))
+  for half in 1:2
+    for block in 1:n_blocks
+      context,word = order[half][block]
+      addbreak(instruct(stimulus_description[word],clean_whitespace=false))
+      for i in 1:n_repeats
+        context_phase = real_trial(context,word,phase="context",spacing=context)
+        test_phase = real_trial(:normal,word,phase="test",spacing=context)
 
-    context_phase = real_trial(contexts[trial],words[trial],
-                               phase="context",
-                               spacing=contexts[trial])
-
-    test_phase = real_trial(:normal,words[trial],
-                            phase="test",
-                            spacing=contexts[trial])
-
-    addtrial(context_phase,test_phase)
+        addtrial(context_phase,test_phase)
+      end
+    end
   end
 end
 
