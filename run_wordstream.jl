@@ -75,6 +75,14 @@ dome = load("sounds/dome.wav")
 drun = load("sounds/drun.wav")
 drum = load("sounds/drum.wav")
 
+billig_s_stone = load("sounds/billig_s_stone.wav")
+billig_dohne = load("sounds/billig_dohne.wav")
+billig_dome = load("sounds/billig_dome.wav")
+billig_s_stone = billig_s_stone[1:end-round(Int,44100*29ms)]
+
+billig_normal_s_gap = 29ms
+billig_negative_s_gap = -29ms
+
 # what is the dB difference between the s and the dohne?
 rms(x) = sqrt(mean(x.^2))
 dB_s = -20log10(rms(s_stone) / rms(dohne))
@@ -88,10 +96,14 @@ stimuli = Dict(
   (:negative, :w2nw) => withgap(s_stone,dohne,negative_s_gap),
   (:normal,   :nw2w) => withgap(s_stone,dome,normal_s_gap),
   (:negative, :nw2w) => withgap(s_stone,dome,negative_s_gap),
-  (:normal,   :w2w) => withgap(s_stone,drum,normal_s_gap),
-  (:negative, :w2w) => withgap(s_stone,drum,negative_s_gap),
-  (:normal,   :nw2nw) => withgap(s_stone,drun,normal_s_gap),
-  (:negative, :nw2nw) => withgap(s_stone,drun,negative_s_gap)
+  (:normal,   :w2nw2) => withgap(billig_s_stone,billig_dohne,billig_normal_s_gap),
+  (:negative, :w2nw2) => withgap(billig_s_stone,billig_dohne,billig_negative_s_gap),
+  (:normal,   :nw2w2) => withgap(billig_s_stone,billig_dome,billig_normal_s_gap),
+  (:negative, :nw2w2) => withgap(billig_s_stone,billig_dome,billig_negative_s_gap)
+  # (:normal,   :w2w) => withgap(s_stone,drum,normal_s_gap),
+  # (:negative, :w2w) => withgap(s_stone,drum,negative_s_gap),
+  # (:normal,   :nw2nw) => withgap(s_stone,drun,normal_s_gap),
+  # (:negative, :nw2nw) => withgap(s_stone,drun,negative_s_gap)
 )
 
 stimulus_description = Dict(
@@ -116,6 +128,8 @@ In what follows you will be presented the sound "strun".
 If you hear "strun" press "Q". If you hear "drun" press "P".
 """
 )
+stimulus_description[:w2nw2] = stimulus_description[:w2nw]
+stimulus_description[:nw2w2] = stimulus_description[:nw2w]
 
 # block all words in first, and then second half
 order = [keys(stimuli) |> collect |> shuffle,
