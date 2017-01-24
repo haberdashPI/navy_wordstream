@@ -36,6 +36,8 @@ maybe have some limit for how long we continue without any response?
 # indicate that switch , sometimes occuring on the *next* stimulus. Might
 # make relationship between EEG and beahvioral data difficult to interpret.
 
+# NOTE: record mispressed keys
+
 include("util.jl")
 using Weber
 using Lazy: @>
@@ -55,11 +57,11 @@ randomize_by(sid)
 SOA = 672.5ms
 practice_spacing = 150ms
 response_spacing = 200ms
-n_trials = 48 # n/2 needs to be a multiple of 8 (the number of stimuli)
+n_trials = 80 # n/2 needs to be a multiple of 8 (the number of stimuli)
 n_break_after = 10
 n_repeat_example = 20
 stimuli_per_response = 3
-responses_per_phase = 15
+responses_per_phase = 9
 normal_s_gap = 41ms
 negative_s_gap = -41ms
 
@@ -96,22 +98,22 @@ stimulus_description = Dict(
   :w2nw => """
 In what follows you will be presented the sound "stone".
 
-If you hear "stone" press "Q". If you hear "s" - "dohne" press "P".
+If you hear "stone" press "Q". If you hear "dohne" press "P".
 """,
   :nw2w => """
 In what follows you will be presented the sound "stome".
 
-If you hear "stome" press "Q". If you hear "s" - "dome" press "P".
+If you hear "stome" press "Q". If you hear "dome" press "P".
 """,
   :w2w => """
 In what follows you will be presented the sound "strum".
 
-If you hear "strum" press "Q". If you hear "s" - "drum" press "P".
+If you hear "strum" press "Q". If you hear "drum" press "P".
 """,
   :nw2nw => """
 In what follows you will be presented the sound "strun".
 
-If you hear "strun" press "Q". If you hear "s" - "drun" press "P".
+If you hear "strun" press "Q". If you hear "drun" press "P".
 """
 )
 
@@ -231,10 +233,18 @@ setup(exp) do
 
   n_blocks = length(keys(stimuli))
   n_repeats = div(n_trials,2length(keys(stimuli)))
+  n_breaks = 2*n_blocks - 1
   for half in 1:2
     for block in 1:n_blocks
       context,word = order[half][block]
-      addbreak(instruct(stimulus_description[word],clean_whitespace=false))
+      n_break = (half-1)*n_blocks + block - 1
+      if n_break > 0
+        addbreak(instruct("You can take break (break $n_break of $n_breaks).\n"*
+                          stimulus_description[word],clean_whitespace=false))
+      else
+        addbreak(instruct(stimulus_description[word],clean_whitespace=false))
+      end
+
       for i in 1:n_repeats
         context_phase = real_trial(context,word,phase="context",spacing=context)
         test_phase = real_trial(:normal,word,phase="test",spacing=context)
