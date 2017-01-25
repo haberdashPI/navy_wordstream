@@ -44,7 +44,7 @@ using Lazy: @>
 include("calibrate.jl")
 setup_sound(buffer_size=buffer_size)
 
-version = v"0.2.3"
+version = v"0.3.0"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 
 const ms = 1/1000
