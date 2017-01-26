@@ -44,7 +44,7 @@ using Lazy: @>
 include("calibrate.jl")
 setup_sound(buffer_size=buffer_size)
 
-version = v"0.3.0"
+version = v"0.3.1"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 
 const ms = 1/1000
@@ -60,8 +60,7 @@ response_spacing = 200ms
 n_trials = 80 # n/2 needs to be a multiple of 8 (the number of stimuli)
 n_break_after = 10
 n_repeat_example = 20
-stimuli_per_response = 3
-responses_per_phase = 9
+stimuli_per_phase = 36
 normal_s_gap = 41ms
 negative_s_gap = -41ms
 
@@ -110,22 +109,22 @@ stimulus_description = Dict(
   :w2nw => """
 In what follows you will be presented the sound "stone".
 
-If you hear "stone" press "Q". If you hear "dohne" press "P".
+When you hear "stone" press "Q". When you hear "dohne" press "P".
 """,
   :nw2w => """
 In what follows you will be presented the sound "stome".
 
-If you hear "stome" press "Q". If you hear "dome" press "P".
+When you hear "stome" press "Q". When you hear "dome" press "P".
 """,
   :w2w => """
 In what follows you will be presented the sound "strum".
 
-If you hear "strum" press "Q". If you hear "drum" press "P".
+When you hear "strum" press "Q". When you hear "drum" press "P".
 """,
   :nw2nw => """
 In what follows you will be presented the sound "strun".
 
-If you hear "strun" press "Q". If you hear "drun" press "P".
+When you hear "strun" press "Q". When you hear "drun" press "P".
 """
 )
 stimulus_description[:w2nw2] = stimulus_description[:w2nw]
@@ -147,37 +146,15 @@ function syllable(spacing,stimulus;info...)
   end,moment(SOA)]
 end
 
-# in a practice trial, the listener is given a prompt if they're too slow
-function practice_trial(spacing,stimulus,limit;info...)
-  asyllable = syllable(spacing,stimulus;info...)
-  resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
-
-  go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
-  waitlen = SOA*stimuli_per_response+limit
-  min_wait = SOA*stimuli_per_response+response_spacing
-  await = timeout(isresponse,waitlen,atleast=min_wait) do time
-    record("response_timeout";info...)
-    display(go_faster)
-  end
-
-  x = [moment(practice_spacing),resp,show_cross(),
-       moment(repeated(asyllable,stimuli_per_response)),
-       await]
-  repeat(x,outer=responses_per_phase)
-end
-
 # in the real trials the presentations are continuous and do not wait for
 # responses
-function real_trial(spacing,stimulus;info...)
+function one_trial(spacing,stimulus;info...)
   clear = visual(colorant"gray")
   blank = moment(t -> display(clear))
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
   asyllable = syllable(spacing,stimulus;info...)
 
-  x = [resp,show_cross(),
-       moment(repeated(asyllable,stimuli_per_response)),
-       moment(SOA*stimuli_per_response+response_spacing)]
-  repeat(x,outer=responses_per_phase)
+  [resp,show_cross(),repeated(asyllable,stimuli_per_phase)]
 end
 
 exp = Experiment(condition = "pilot",sid = sid,version = version,
@@ -193,7 +170,7 @@ setup(exp) do
   addbreak(
     instruct("""
 
-      In each trial of the present experiment you will listen to the same word
+      During present experiment you will listen to the same word
       or a non-word repeated over and over. Over time the sound of this word or
       non-word may (or may not) appear to change."""),
     instruct("""
@@ -206,7 +183,6 @@ setup(exp) do
               repeated(syllable(:normal,:w2nw,phase="example"),
                        n_repeat_example))
 
-  x = stimuli_per_response
   addbreak(
     instruct("""
 
@@ -220,26 +196,19 @@ setup(exp) do
       other changes to the sound that you hear; please ignore them."""),
     instruct("""
 
-      After several sounds, we want you to indicate what you heard. Let's
-      practice a bit.  Use "Q" to indicate that you heard the "s" as part of the
-      sound all of the time and "P" if you heard the "s" as separate at any
-      point. Respond as promptly as you can."""))
+      During this experiment, as soon as you hear the "s" as part of the sound,
+      press "Q" and as soon as you hear it as separate, press "P". For example
+      when you start hearing "stone" press "Q" and when you start hearing "dohne"
+      press "P". Respond as promptly as you can. """),
+    instruct("""
+      Let's start with some practice trials.
+    """))
 
-  addpractice(practice_trial(:normal,:w2nw,10response_spacing,phase="practice"))
-
-  addbreak(instruct("""
-
-    In the real experiment, your time to respond will be limited. Let's
-    try another practice round, this time a little bit faster.
-  """) )
-
-  addpractice(practice_trial(:normal,:w2nw,2response_spacing,phase="practice"))
+  addpractice(one_trial(:normal,:w2nw,phase="practice"))
 
   addbreak(instruct("""
-
-    In the real experiment, your time to respond will be even more limited. Try
-    to respond before the next trial begins, but even if you don't please still
-    respond.""") )
+    Please check with the experimenter before you continue.
+    """))
 
   str = visual("Hit any key to start the real experiment...")
   anykey = moment(t -> display(str))
@@ -260,8 +229,8 @@ setup(exp) do
       end
 
       for i in 1:n_repeats
-        context_phase = real_trial(context,word,phase="context",spacing=context)
-        test_phase = real_trial(:normal,word,phase="test",spacing=context)
+        context_phase = one_trial(context,word,phase="context",spacing=context)
+        test_phase = one_trial(:normal,word,phase="test",spacing=context)
 
         addtrial(context_phase,test_phase)
       end
