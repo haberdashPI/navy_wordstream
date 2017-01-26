@@ -3,13 +3,13 @@ library(ggplot2)
 library(dplyr)
 source('trial_to_times.R')
 
-file_pat = 'pilot_[0-9]+.*0.2.3_2017.*.csv'
-data = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
+file_pat = 'pilot_[0-9]+.*0.2.2_2017.*.csv'
+## data = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
 
 by_time = data %>%
   filter(code %in% c('stimulus','stream_1','stream_2')) %>%
   group_by(sid,trial) %>%
-  do(trial_to_times(.,max_seconds=48))
+  do(trial_to_times(.,max_seconds=80))
 
 by_context = by_time %>%
 	filter(response > 0) %>%
