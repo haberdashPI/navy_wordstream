@@ -138,19 +138,16 @@ isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
 
 # presents a single syllable
 function syllable(spacing,stimulus;info...)
-  sound = stimuli[spacing,stimulus]
-
-  [moment() do t
-    play(sound)
-    record("stimulus",stimulus=stimulus,spacing=spacing;info...)
-  end,moment(SOA)]
+  [moment(play,stimuli[spacing,stimulus]),
+   moment(record,"stimulus",stimulus=stimulus,spacing=spacing;info...),
+   moment(SOA)]
 end
 
 # in the real trials the presentations are continuous and do not wait for
 # responses
 function one_trial(spacing,stimulus;info...)
   clear = visual(colorant"gray")
-  blank = moment(t -> display(clear))
+  blank = moment(display,clear)
   resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
   asyllable = syllable(spacing,stimulus;info...)
 
@@ -162,10 +159,10 @@ exp = Experiment(condition = "pilot",sid = sid,version = version,
                  skip=trial_skip,columns = [:stimulus,:spacing,:phase])
 
 setup(exp) do
-  start = moment(t -> record("start"))
+  start = moment(record,"start")
 
   clear = visual(colorant"gray")
-  blank = moment(t -> display(clear))
+  blank = moment(display,clear)
 
   addbreak(
     instruct("""
@@ -210,8 +207,7 @@ setup(exp) do
     Please check with the experimenter before you continue.
     """))
 
-  str = visual("Hit any key to start the real experiment...")
-  anykey = moment(t -> display(str))
+  anykey = moment(display,"Hit any key to start the real experiment...")
   addbreak(anykey,await_response(iskeydown))
 
   n_blocks = length(keys(stimuli))
