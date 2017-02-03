@@ -1,0 +1,95 @@
+* Wordstream Results
+** Setup
+*** loading
+
+#+begin_src R :session
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+source('trial_to_times.R')
+
+file_pat = 'pilot_[0-9]+.*0.3.0_2017.*.csv'
+data1 = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
+
+file_pat = 'pilot_[0-9]+.*0.3.1_2017.*.csv'
+data2 = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
+
+data1$type = 'intermittent (n=2)'
+data2$type = 'continuous (n=1)'
+data = rbind(data1,data2)
+#+end_src
+
+#+RESULTS:
+
+** Individual Time course
+
+#+begin_src R :session
+by_time = data %>%
+  filter(code %in% c('stimulus','stream_1','stream_2')) %>%
+  group_by(sid,type,trial) %>%
+  do(trial_to_times(.,max_seconds=48))
+
+by_context = by_time %>%
+	filter(response > 0) %>%
+	group_by(sid,type,time,stimulus,context) %>%
+	summarise(response = mean(response-1),N = length(response))
+
+for(num in unique(by_time$sid)){
+  legend = guide_legend(title='Context Stimulus')
+  ggplot(subset(by_context,sid == num),
+         aes(x=time,y=response,color=context,group=context)) +
+    geom_line() + facet_wrap(~stimulus) +
+    geom_hline(yintercept=0.5,linetype=2) +
+    theme_classic() + ylab('% streaming') + xlab('time (s)')
+  ggsave(paste('plots/ind_',num,'_',Sys.Date(),'.pdf',sep=''))
+}
+#+end_src
+
+#+RESULTS:
+
+** Mean Responses
+
+#+begin_src R :session
+data$stim_group = ifelse(data$stimulus %in% c('nw2w','nw2w2'),'nw2w','w2nw')
+
+trial_to_responses = function(trial){
+  responses = subset(trial,code %in% c('stream_1','stream_2'))
+  stim = subset(trial,code == 'stimulus')
+  data.frame(trial=trial$trial[1],
+             stimulus=if(nrow(stim) > 0){last(stim$stim_group)}else{NA},
+             response=if(nrow(responses) > 0){last(responses$code)}else{NA})
+}
+responses = data %>%
+  filter(trial >= 1,code %in% c('stimulus','stream_1','stream_2')) %>%
+  group_by(trial,type,sid) %>%
+  do(trial_to_responses(.)) %>%
+  mutate(response = as.numeric(response=='stream_2'))
+
+
+ggplot(responses,aes(x=stimulus,y=response,shape=factor(sid))) +
+  stat_summary(fun.data='mean_cl_boot',fun.args=list(conf.int=0.682),
+               position=position_dodge(width=0.1)) +
+  facet_wrap(~type) + theme_classic() + ylab("% streaming") +
+  scale_x_discrete(labels=c('non-word\nto word','word to\nnon-word')) +
+  coord_cartesian(ylim=c(0.1,0.9))
+
+ggsave(paste('plots/simple_wordstream_int_v_cont.',Sys.Date(),'.pdf',sep=''),
+       useDingbats=F)
+#+end_src
+
+** Mean Response Time course
+
+#+begin_src R :session
+means = by_context %>%
+  group_by(time,stimulus,context) %>%
+  summarise(response = mean(response))
+
+ggplot(means,
+       aes(x=time,y=response,color=context,group=context)) +
+	geom_line() + facet_wrap(~stimulus) +
+  geom_hline(yintercept=0.5,linetype=2) +
+	theme_classic() + ylab('% streaming') + xlab('time (s)')
+ggsave(paste('plots/means_',Sys.Date(),'.pdf',sep=''))
+#+end_src
+
+#+RESULTS:
