@@ -1,4 +1,4 @@
-Pkg.add("Weber",v"0.3.0")
+Pkg.add("Weber",v"0.3.2")
 Pkg.add("Lazy")
 open("calibrate.jl","w") do s
   println(s,"# call run_calibrate() to select an appropriate attenuation.")
