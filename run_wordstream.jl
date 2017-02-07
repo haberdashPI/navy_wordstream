@@ -1,71 +1,46 @@
 #!/usr/bin/env julia
 
-# NOTES
-#===============================================================================
-
-What is up with 0002 and 0004? why aren't the negative sounds working?
-
-0004 - did not understand the task, interpreted split as based on the number of
-syllables
-
-0002 - anna is not sure, thinks maybe negative were different words (but
-guessing it was a confusiong aobut which were new and which were "old" words)
-
-show a message for word transitions
-shorter session? running 90 minutes right now, is rough for participants
-
-go through several examples. How would we handle the negative examples?
-
-maybe have some limit for how long we continue without any response?
-
-===============================================================================#
-
-# NOTES - from 0.2.2
-# pitch changes??
-# more chunks of the same sound
-# maybe introduce to other VTs
-# do we have people respond to the most recent stimulus rather than all 4?
-# or does it split at all
-# do we run as a block?
-# allow restarting of experiment
-# make shorter? or make sure 1st half has everything
-# maybe block the stimuli?
-
-# NOTES - from older
-# concern that there is a delay in when you hear a stream switch and when you
-# indicate that switch , sometimes occuring on the *next* stimulus. Might
-# make relationship between EEG and beahvioral data difficult to interpret.
-
 # NOTE: record mispressed keys
 
-include("util.jl")
 using Weber
-using Lazy: @>
 include("calibrate.jl")
 setup_sound(buffer_size=buffer_size)
 
-version = v"0.3.1"
-sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
+version = v"0.3.2"
+sid,trial_skip,presentation =
+  @read_args("Runs a wordstream experiment, version $version.",
+             presentation = [:cont,:int])
 
 const ms = 1/1000
+
+# terminology
+#
+# Each *trial* is divided into two phases: a context phase and a test phase
+# Each *phase* is dividied up into one more presentations.
+# Each *presentation* consists of a series of stimuli, and one or more
+# responses to those stimuli.
 
 # when the sid is the same, the randomization should be the same
 randomize_by(sid)
 
-# We might be able to change this to ISI now that there
-# is no gap.
 SOA = 672.5ms
-practice_spacing = 150ms
-response_spacing = 200ms
-n_trials = 80 # n/2 needs to be a multiple of 8 (the number of stimuli)
-n_break_after = 10
+n_trials = 24
 n_repeat_example = 20
-stimuli_per_phase = 36
+
+if presentation == :int
+  response_spacing = 200ms
+  stimuli_per_presentation = 3
+  presentations_per_phase = 9
+elseif presentation == :cont
+  stimuli_per_presentation = 36
+  presentations_per_phase = 1
+end
+
 normal_s_gap = 41ms
 negative_s_gap = -41ms
 
-if n_trials % 16 != 0
-  error("n_trials/2 must be a multiple of 8")
+if n_trials % 8 != 0
+  error("n_trials must be a multiple of 8")
 end
 
 s_stone = load("sounds/s_stone.wav")
@@ -73,14 +48,6 @@ dohne = load("sounds/dohne.wav")
 dome = load("sounds/dome.wav")
 drun = load("sounds/drun.wav")
 drum = load("sounds/drum.wav")
-
-billig_s_stone = load("sounds/billig_s_stone.wav")
-billig_dohne = load("sounds/billig_dohne.wav")
-billig_dome = load("sounds/billig_dome.wav")
-billig_s_stone = billig_s_stone[1:end-round(Int,44100*29ms)]
-
-billig_normal_s_gap = 29ms
-billig_negative_s_gap = -29ms
 
 # what is the dB difference between the s and the dohne?
 rms(x) = sqrt(mean(x.^2))
@@ -95,10 +62,6 @@ stimuli = Dict(
   (:negative, :w2nw) => withgap(s_stone,dohne,negative_s_gap),
   (:normal,   :nw2w) => withgap(s_stone,dome,normal_s_gap),
   (:negative, :nw2w) => withgap(s_stone,dome,negative_s_gap),
-  (:normal,   :w2nw2) => withgap(billig_s_stone,billig_dohne,billig_normal_s_gap),
-  (:negative, :w2nw2) => withgap(billig_s_stone,billig_dohne,billig_negative_s_gap),
-  (:normal,   :nw2w2) => withgap(billig_s_stone,billig_dome,billig_normal_s_gap),
-  (:negative, :nw2w2) => withgap(billig_s_stone,billig_dome,billig_negative_s_gap)
   # (:normal,   :w2w) => withgap(s_stone,drum,normal_s_gap),
   # (:negative, :w2w) => withgap(s_stone,drum,negative_s_gap),
   # (:normal,   :nw2nw) => withgap(s_stone,drun,normal_s_gap),
@@ -127,31 +90,54 @@ In what follows you will be presented the sound "strun".
 When you hear "strun" press "Q". When you hear "drun" press "P".
 """
 )
-stimulus_description[:w2nw2] = stimulus_description[:w2nw]
-stimulus_description[:nw2w2] = stimulus_description[:nw2w]
 
 # block all words in first, and then second half
 order = [keys(stimuli) |> collect |> shuffle,
          keys(stimuli) |> collect |> shuffle]
 
-isresponse(e) = iskeydown(e,key"p") || iskeydown(e,key"q")
+stream_1_key = key"q"
+stream_2_key = key"p"
+isresponse(e) = iskeydown(e,stream_1_key) || iskeydown(e,stream_2_key)
 
 # presents a single syllable
 function syllable(spacing,stimulus;info...)
-  [moment(play,stimuli[spacing,stimulus]),
-   moment(record,"stimulus",stimulus=stimulus,spacing=spacing;info...),
-   moment(SOA)]
+  sound = stimuli[spacing,stimulus]
+
+  [moment() do
+    play(sound)
+    record("stimulus",stimulus=stimulus,spacing=spacing;info...)
+  end,moment(SOA)]
+end
+
+# in a practice phase, the listener is given a prompt if they're too slow
+function practice_phase(spacing,stimulus,limit;info...)
+  asyllable = syllable(spacing,stimulus;info...)
+  resp = response(stream_1_key => "stream_1",stream_2_key => "stream_2";info...)
+
+  go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
+  waitlen = SOA*stimuli_per_presentation+limit
+  min_wait = SOA*stimuli_per_presentation+response_spacing
+  await = timeout(isresponse,waitlen,atleast=min_wait) do
+    record("response_timeout";info...)
+    display(go_faster)
+  end
+
+  x = [moment(practice_spacing),resp,show_cross(),
+       moment(repeated(asyllable,stimuli_per_presentation)),
+       await]
+  repeat(x,outer=presentations_per_phase)
 end
 
 # in the real trials the presentations are continuous and do not wait for
 # responses
-function one_trial(spacing,stimulus;info...)
-  clear = visual(colorant"gray")
-  blank = moment(display,clear)
-  resp = response(key"q" => "stream_1",key"p" => "stream_2";info...)
+function real_phase(spacing,stimulus;info...)
+  blank = moment(display,colorant"gray")
+  resp = response(stream_1_key => "stream_1",stream_2_key => "stream_2";info...)
   asyllable = syllable(spacing,stimulus;info...)
 
-  [resp,show_cross(),repeated(asyllable,stimuli_per_phase)]
+  x = [resp,show_cross(),repeated(asyllable,stimuli_per_presentation),
+       moment(response_spacing)]
+  repeat(x,outer=presentations_per_phase)
 end
 
 exp = Experiment(condition = "pilot",sid = sid,version = version,
@@ -159,15 +145,14 @@ exp = Experiment(condition = "pilot",sid = sid,version = version,
                  skip=trial_skip,columns = [:stimulus,:spacing,:phase])
 
 setup(exp) do
-  start = moment(record,"start")
+  addbreak(moment(record,"start"))
 
-  clear = visual(colorant"gray")
-  blank = moment(display,clear)
+  blank = moment(display,colorant"gray")
 
   addbreak(
     instruct("""
 
-      During present experiment you will listen to the same word
+      During this experiment you will listen to the same word
       or a non-word repeated over and over. Over time the sound of this word or
       non-word may (or may not) appear to change."""),
     instruct("""
@@ -190,22 +175,16 @@ setup(exp) do
 
       So, for example, if the word presented is "stone" we
       want to know if you hear "stone" or "dohne". There may be
-      other changes to the sound that you hear; please ignore them."""),
-    instruct("""
-
-      During this experiment, as soon as you hear the "s" as part of the sound,
-      press "Q" and as soon as you hear it as separate, press "P". For example
-      when you start hearing "stone" press "Q" and when you start hearing "dohne"
-      press "P". Respond as promptly as you can. """),
-    instruct("""
-      Let's start with some practice trials.
-    """))
-
-  addpractice(one_trial(:normal,:w2nw,phase="practice"))
+      other changes to the sound that you hear; please ignore them."""))
 
   addbreak(instruct("""
-    Please check with the experimenter before you continue.
-    """))
+
+    As the sound plays we want you to indicate what you heard. Let's practice a
+    bit. Hold down "Q" when you hear "stone". Hold down "P" when year hear
+    "dohne".
+  """))
+
+  addpractice(real_phase(:normal,:w2nw,phase="practice",spacing=:normal))
 
   anykey = moment(display,"Hit any key to start the real experiment...")
   addbreak(anykey,await_response(iskeydown))
@@ -225,8 +204,8 @@ setup(exp) do
       end
 
       for i in 1:n_repeats
-        context_phase = one_trial(context,word,phase="context",spacing=context)
-        test_phase = one_trial(:normal,word,phase="test",spacing=context)
+        context_phase = real_phase(context,word,phase="context",spacing=context)
+        test_phase = real_phase(:normal,word,phase="test",spacing=context)
 
         addtrial(context_phase,test_phase)
       end
