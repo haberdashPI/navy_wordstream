@@ -6,10 +6,8 @@ using Weber
 include("calibrate.jl")
 setup_sound(buffer_size=buffer_size)
 
-version = v"0.3.2"
-sid,trial_skip,presentation =
-  @read_args("Runs a wordstream experiment, version $version.",
-             presentation = [:cont,:int])
+version = v"0.3.3"
+sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 
 const ms = 1/1000
 
@@ -24,17 +22,13 @@ const ms = 1/1000
 randomize_by(sid)
 
 SOA = 672.5ms
-n_trials = 24
+practice_spacing = 150ms
+response_spacing = 200ms
+n_trials = 48 # n/2 needs to be a multiple of 8 (the number of stimuli)
+n_break_after = 10
 n_repeat_example = 20
-
-if presentation == :int
-  response_spacing = 200ms
-  stimuli_per_presentation = 3
-  presentations_per_phase = 9
-elseif presentation == :cont
-  stimuli_per_presentation = 36
-  presentations_per_phase = 1
-end
+stimuli_per_response = 3
+responses_per_phase = 9
 
 normal_s_gap = 41ms
 negative_s_gap = -41ms
@@ -53,41 +47,50 @@ drum = load("sounds/drum.wav")
 rms(x) = sqrt(mean(x.^2))
 dB_s = -20log10(rms(s_stone) / rms(dohne))
 
-function withgap(a,b,gap)
-  sound(mix(attenuate(a,atten_dB+dB_s),[silence(duration(a)+gap); attenuate(b,atten_dB)]))
+function syllables(a,b,gap)
+  x = mix(attenuate(a,atten_dB+dB_s),
+          [silence(duration(a)+gap); attenuate(b,atten_dB)])
+
+  xs = silence(SOA*stimuli_per_response)
+  for i in 1:stimuli_per_response
+    at = round(Int,(i-1)*SOA*samplerate(x))+1
+    xs[at:(at+length(x)-1)] = x
+  end
+
+  xs
 end
 
 stimuli = Dict(
-  (:normal,   :w2nw) => withgap(s_stone,dohne,normal_s_gap),
-  (:negative, :w2nw) => withgap(s_stone,dohne,negative_s_gap),
-  (:normal,   :nw2w) => withgap(s_stone,dome,normal_s_gap),
-  (:negative, :nw2w) => withgap(s_stone,dome,negative_s_gap),
-  # (:normal,   :w2w) => withgap(s_stone,drum,normal_s_gap),
-  # (:negative, :w2w) => withgap(s_stone,drum,negative_s_gap),
-  # (:normal,   :nw2nw) => withgap(s_stone,drun,normal_s_gap),
-  # (:negative, :nw2nw) => withgap(s_stone,drun,negative_s_gap)
+  (:normal,   :w2nw) => syllables(s_stone,dohne,normal_s_gap),
+  (:negative, :w2nw) => syllables(s_stone,dohne,negative_s_gap),
+  (:normal,   :nw2w) => syllables(s_stone,dome,normal_s_gap),
+  (:negative, :nw2w) => syllables(s_stone,dome,negative_s_gap),
+  # (:normal,   :w2w) => syllable(s_stone,drum,normal_s_gap),
+  # (:negative, :w2w) => syllable(s_stone,drum,negative_s_gap),
+  # (:normal,   :nw2nw) => syllable(s_stone,drun,normal_s_gap),
+  # (:negative, :nw2nw) => syllable(s_stone,drun,negative_s_gap)
 )
 
 stimulus_description = Dict(
   :w2nw => """
 In what follows you will be presented the sound "stone".
 
-When you hear "stone" press "Q". When you hear "dohne" press "P".
+If you hear "stone" press "Q". If you hear "dohne" press "P".
 """,
   :nw2w => """
 In what follows you will be presented the sound "stome".
 
-When you hear "stome" press "Q". When you hear "dome" press "P".
+If you hear "stome" press "Q". If you hear "dome" press "P".
 """,
   :w2w => """
 In what follows you will be presented the sound "strum".
 
-When you hear "strum" press "Q". When you hear "drum" press "P".
+If you hear "strum" press "Q". If you hear "drum" press "P".
 """,
   :nw2nw => """
 In what follows you will be presented the sound "strun".
 
-When you hear "strun" press "Q". When you hear "drun" press "P".
+If you hear "strun" press "Q". If you hear "drun" press "P".
 """
 )
 
@@ -95,54 +98,50 @@ When you hear "strun" press "Q". When you hear "drun" press "P".
 order = [keys(stimuli) |> collect |> shuffle,
          keys(stimuli) |> collect |> shuffle]
 
-stream_1_key = key"q"
-stream_2_key = key"p"
-isresponse(e) = iskeydown(e,stream_1_key) || iskeydown(e,stream_2_key)
+stream_1 = key"q"
+stream_2 = key"p"
+isresponse(e) = iskeydown(e,stream_2) || iskeydown(e,stream_1)
 
-# presents a single syllable
-function syllable(spacing,stimulus;info...)
-  sound = stimuli[spacing,stimulus]
-
-  [moment() do
-    play(sound)
-    record("stimulus",stimulus=stimulus,spacing=spacing;info...)
-  end,moment(SOA)]
-end
-
-# in a practice phase, the listener is given a prompt if they're too slow
-function practice_phase(spacing,stimulus,limit;info...)
-  asyllable = syllable(spacing,stimulus;info...)
-  resp = response(stream_1_key => "stream_1",stream_2_key => "stream_2";info...)
+# in a practice trial, the listener is given a prompt if they're too slow
+function practice_trial(spacing,stimulus,limit;info...)
+  resp = response(stream_1 => "stream_1",stream_2 => "stream_2";info...)
 
   go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
-  waitlen = SOA*stimuli_per_presentation+limit
-  min_wait = SOA*stimuli_per_presentation+response_spacing
+  waitlen = SOA*stimuli_per_response+limit
+  min_wait = SOA*stimuli_per_response+response_spacing
   await = timeout(isresponse,waitlen,atleast=min_wait) do
     record("response_timeout";info...)
     display(go_faster)
   end
 
-  x = [moment(practice_spacing),resp,show_cross(),
-       moment(repeated(asyllable,stimuli_per_presentation)),
-       await]
-  repeat(x,outer=presentations_per_phase)
+  x = [resp,
+       moment(practice_spacing,play,stimuli[spacing,stimulus]),
+       moment(record,"stimulus";info...),
+       show_cross(),await]
+  repeat(x,outer=responses_per_phase)
 end
 
 # in the real trials the presentations are continuous and do not wait for
 # responses
-function real_phase(spacing,stimulus;info...)
-  blank = moment(display,colorant"gray")
-  resp = response(stream_1_key => "stream_1",stream_2_key => "stream_2";info...)
-  asyllable = syllable(spacing,stimulus;info...)
+function real_trial(spacing,stimulus;info...)
+  resp = response(stream_1 => "stream_1",stream_2 => "stream_2";info...)
 
-  x = [resp,show_cross(),repeated(asyllable,stimuli_per_presentation),
-       moment(response_spacing)]
-  repeat(x,outer=presentations_per_phase)
+  x = [resp,moment(response_spacing,play,stimuli[spacing,stimulus]),
+       moment(record,"stimulus";info...),show_cross(),
+       moment(SOA*stimuli_per_response)]
+  repeat(x,outer=responses_per_phase)
 end
 
-exp = Experiment(condition = "pilot",sid = sid,version = version,
-                 moment_resolution = moment_resolution,
-                 skip=trial_skip,columns = [:stimulus,:spacing,:phase])
+exp = Experiment(
+  moment_resolution = moment_resolution,
+  skip=trial_skip,
+  columns = [
+    :condition => "pilot",
+    :sid => sid,
+    :version => version,
+    :stimulus,:spacing,:phase
+  ]
+)
 
 setup(exp) do
   addbreak(moment(record,"start"))
@@ -152,7 +151,7 @@ setup(exp) do
   addbreak(
     instruct("""
 
-      During this experiment you will listen to the same word
+      In each trial of the present experiment you will listen to the same word
       or a non-word repeated over and over. Over time the sound of this word or
       non-word may (or may not) appear to change."""),
     instruct("""
@@ -162,8 +161,9 @@ setup(exp) do
       "stone" change to the sound "dohne" in the following example."""))
 
   addpractice(blank,show_cross(),
-              repeated(syllable(:normal,:w2nw,phase="example"),
-                       n_repeat_example))
+              repeated([moment(play,stimuli[:normal,:w2nw]),
+                        moment(record,"stimulus",phase="example"),
+                        moment(3*SOA)],round(Int,n_repeat_example/3)))
 
   addbreak(
     instruct("""
@@ -175,16 +175,28 @@ setup(exp) do
 
       So, for example, if the word presented is "stone" we
       want to know if you hear "stone" or "dohne". There may be
-      other changes to the sound that you hear; please ignore them."""))
+      other changes to the sound that you hear; please ignore them."""),
+    instruct("""
+
+      After several sounds, we want you to indicate what you heard. Let's
+      practice a bit.  Use "Q" to indicate that you heard the "s" as part of the
+      sound all of the time and "P" if you heard the "s" as separate at any
+      point. Respond as promptly as you can."""))
+
+  addpractice(practice_trial(:normal,:w2nw,10response_spacing,phase="practice"))
 
   addbreak(instruct("""
 
-    As the sound plays we want you to indicate what you heard. Let's practice a
-    bit. Hold down "Q" when you hear "stone". Hold down "P" when year hear
-    "dohne".
-  """))
+    In the real experiment, your time to respond will be limited. Let's
+    try another practice round, this time a little bit faster.
+  """) )
 
-  addpractice(real_phase(:normal,:w2nw,phase="practice",spacing=:normal))
+  addpractice(practice_trial(:normal,:w2nw,2response_spacing,phase="practice"))
+
+  addbreak(instruct("""
+
+    During the real expeirment, try to respond before the next trial begins, but
+    even if you don't please still respond."""))
 
   anykey = moment(display,"Hit any key to start the real experiment...")
   addbreak(anykey,await_response(iskeydown))
@@ -197,15 +209,16 @@ setup(exp) do
       context,word = order[half][block]
       n_break = (half-1)*n_blocks + block - 1
       if n_break > 0
-        addbreak(instruct("You can take break (break $n_break of $n_breaks).\n"*
-                          stimulus_description[word],clean_whitespace=false))
+        addbreak(
+          instruct("You can a take break (break $n_break of $n_breaks).\n\n"*
+                   stimulus_description[word],clean_whitespace=false))
       else
         addbreak(instruct(stimulus_description[word],clean_whitespace=false))
       end
 
       for i in 1:n_repeats
-        context_phase = real_phase(context,word,phase="context",spacing=context)
-        test_phase = real_phase(:normal,word,phase="test",spacing=context)
+        context_phase = real_trial(context,word,phase="context",spacing=context)
+        test_phase = real_trial(:normal,word,phase="test",spacing=context)
 
         addtrial(context_phase,test_phase)
       end
