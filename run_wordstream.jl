@@ -3,11 +3,14 @@
 # NOTE: record mispressed keys
 
 using Weber
+using Lazy
+
 include("calibrate.jl")
 setup_sound(buffer_size=buffer_size)
 
 version = v"0.3.3"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
+#sid,trial_skip = "test",0
 
 const ms = 1/1000
 
@@ -144,7 +147,9 @@ exp = Experiment(
 )
 
 setup(exp) do
-  addbreak(moment(record,"start"))
+  addbreak(moment(record,"start"),
+           moment(250ms,play,@> tone(1000,1) ramp attenuate(atten_dB)),
+           moment(1))
 
   blank = moment(display,colorant"gray")
 
@@ -161,9 +166,11 @@ setup(exp) do
       "stone" change to the sound "dohne" in the following example."""))
 
   addpractice(blank,show_cross(),
-              repeated([moment(play,stimuli[:normal,:w2nw]),
+              repeated([moment(SOA,play,stimuli[:normal,:w2nw]),
                         moment(record,"stimulus",phase="example"),
-                        moment(3*SOA)],round(Int,n_repeat_example/3)))
+                        moment(2SOA)],
+                       round(Int,n_repeat_example/3)),
+              moment(SOA))
 
   addbreak(
     instruct("""
@@ -226,5 +233,4 @@ setup(exp) do
   end
 end
 
-play(attenuate(ramp(tone(1000,1)),atten_dB),wait=true)
 run(exp)
