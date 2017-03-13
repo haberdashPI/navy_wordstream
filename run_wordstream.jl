@@ -6,7 +6,6 @@ using Weber
 using Lazy
 
 include("calibrate.jl")
-setup_sound(buffer_size=buffer_size)
 
 version = v"0.3.3"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
@@ -25,7 +24,7 @@ const ms = 1/1000
 randomize_by(sid)
 
 SOA = 672.5ms
-practice_spacing = 150ms
+practice_spacing = 250ms
 response_spacing = 200ms
 n_trials = 48 # n/2 needs to be a multiple of 8 (the number of stimuli)
 n_break_after = 10
@@ -126,12 +125,11 @@ end
 
 # in the real trials the presentations are continuous and do not wait for
 # responses
-function real_trial(spacing,stimulus;info...)
+function real_trial(spacing,stimulus,first_trial;info...)
   resp = response(stream_1 => "stream_1",stream_2 => "stream_2";info...)
-
-  x = [resp,moment(response_spacing,play,stimuli[spacing,stimulus]),
-       moment(record,"stimulus";info...),show_cross(),
-       moment(SOA*stimuli_per_response)]
+  trial_soa = first_trial ? SOA*stimuli_per_response+response_spacing : SOA
+  x = [moment(trial_soa,play,stimuli[spacing,stimulus]),resp,
+       moment(record,"stimulus";info...),show_cross()]
   repeat(x,outer=responses_per_phase)
 end
 
@@ -224,8 +222,8 @@ setup(exp) do
       end
 
       for i in 1:n_repeats
-        context_phase = real_trial(context,word,phase="context",spacing=context)
-        test_phase = real_trial(:normal,word,phase="test",spacing=context)
+        context_phase = real_trial(context,word,i==1,phase="context",spacing=context)
+        test_phase = real_trial(:normal,word,i==1,phase="test",spacing=context)
 
         addtrial(context_phase,test_phase)
       end
