@@ -27,7 +27,6 @@ SOA = 672.5ms
 practice_spacing = 250ms
 response_spacing = 200ms
 n_trials = 144 # n/2 needs to be a multiple of 8 (the number of stimuli)
-n_break_after = 10
 n_repeat_example = 20
 stimuli_per_response = 3
 responses_per_phase = 9
