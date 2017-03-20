@@ -7,7 +7,7 @@ using Lazy
 
 include("calibrate.jl")
 
-version = v"0.3.3"
+version = v"0.3.4"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 #sid,trial_skip = "test",0
 
@@ -115,10 +115,10 @@ function practice_trial(spacing,stimulus,limit;info...)
     display(go_faster)
   end
 
-  x = [resp,
-       moment(practice_spacing,play,stimuli[spacing,stimulus]),
+  x = [resp,show_cross(),
+       moment(play,stimuli[spacing,stimulus]),
        moment(record,"stimulus";info...),
-       show_cross(),await]
+       await,moment(practice_spacing)]
   repeat(x,outer=responses_per_phase)
 end
 
@@ -126,9 +126,9 @@ end
 # responses
 function real_trial(spacing,stimulus,first_trial;info...)
   resp = response(stream_1 => "stream_1",stream_2 => "stream_2";info...)
-  trial_soa = first_trial ? SOA*stimuli_per_response+response_spacing : SOA
-  x = [moment(trial_soa,play,stimuli[spacing,stimulus]),resp,
-       moment(record,"stimulus";info...),show_cross()]
+  x = [resp,moment(play,stimuli[spacing,stimulus]),
+       moment(record,"stimulus";info...),show_cross(),
+       moment(SOA*stimuli_per_response+response_spacing)]
   repeat(x,outer=responses_per_phase)
 end
 
@@ -163,9 +163,9 @@ setup(exp) do
       "stone" change to the sound "dohne" in the following example."""))
 
   addpractice(blank,show_cross(),
-              repeated([moment(SOA,play,stimuli[:normal,:w2nw]),
+              repeated([moment(play,stimuli[:normal,:w2nw]),
                         moment(record,"stimulus",phase="example"),
-                        moment(2SOA)],
+                        moment(3SOA)],
                        round(Int,n_repeat_example/3)),
               moment(SOA))
 
