@@ -11,7 +11,21 @@ version = v"0.3.4"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 #sid,trial_skip = "test",0
 
+exp = Experiment(
+  moment_resolution = moment_resolution,
+  skip=trial_skip,
+  columns = [
+    :condition => "pilot",
+    :sid => sid,
+    :version => version,
+    :stimulus,:spacing,:phase
+  ]
+)
+
 const ms = 1/1000
+
+################################################################################
+# settings
 
 # terminology
 #
@@ -103,13 +117,16 @@ stream_1 = key"q"
 stream_2 = key"p"
 isresponse(e) = iskeydown(e,stream_2) || iskeydown(e,stream_1)
 
+################################################################################
+# trial defintions
+
 # in a practice trial, the listener is given a prompt if they're too slow
 function practice_trial(spacing,stimulus,limit;info...)
   resp = response(stream_1 => "stream_1",stream_2 => "stream_2";info...)
 
   go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
   waitlen = SOA*stimuli_per_response+limit
-  min_wait = SOA*stimuli_per_response+response_spacing
+  min_wait = SOA*stimuli_per_response
   await = timeout(isresponse,waitlen,atleast=min_wait) do
     record("response_timeout";info...)
     display(go_faster)
@@ -124,7 +141,7 @@ end
 
 # in the real trials the presentations are continuous and do not wait for
 # responses
-function real_trial(spacing,stimulus,first_trial;info...)
+function real_trial(spacing,stimulus;info...)
   resp = response(stream_1 => "stream_1",stream_2 => "stream_2";info...)
   x = [resp,moment(play,stimuli[spacing,stimulus]),
        moment(record,"stimulus";info...),show_cross(),
@@ -132,17 +149,8 @@ function real_trial(spacing,stimulus,first_trial;info...)
   repeat(x,outer=responses_per_phase)
 end
 
-exp = Experiment(
-  moment_resolution = moment_resolution,
-  skip=trial_skip,
-  columns = [
-    :condition => "pilot",
-    :sid => sid,
-    :version => version,
-    :stimulus,:spacing,:phase
-  ]
-)
-
+################################################################################
+# expeirment setup
 setup(exp) do
   addbreak(moment(record,"start"),
            moment(250ms,play,@> tone(1000,1) ramp attenuate(atten_dB)),
@@ -221,8 +229,10 @@ setup(exp) do
       end
 
       for i in 1:n_repeats
-        context_phase = real_trial(context,word,i==1,phase="context",spacing=context)
-        test_phase = real_trial(:normal,word,i==1,phase="test",spacing=context)
+        context_phase = real_trial(context,word,phase="context",
+                                   spacing=context,stimulus=word)
+        test_phase = real_trial(:normal,word,phase="test",
+                                spacing=context,stimulus=word)
 
         addtrial(context_phase,test_phase)
       end
