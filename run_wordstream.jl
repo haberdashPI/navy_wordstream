@@ -40,7 +40,7 @@ randomize_by(sid)
 SOA = 672.5ms
 practice_spacing = 250ms
 response_spacing = 200ms
-n_trials = 144 # n/2 needs to be a multiple of 8 (the number of stimuli)
+n_trials = 72 # needs to be a multiple of 8 (= n stimuli x n halves)
 n_repeat_example = 20
 stimuli_per_response = 3
 responses_per_phase = 9
@@ -69,7 +69,7 @@ function syllables(a,b,gap)
   xs = silence(SOA*stimuli_per_response)
   for i in 1:stimuli_per_response
     at = round(Int,(i-1)*SOA*samplerate(x))+1
-    xs[at:(at+length(x)-1)] = x
+    xs[at:(at+size(x,1)-1)] = x
   end
 
   xs
@@ -80,6 +80,7 @@ stimuli = Dict(
   (:negative, :w2nw) => syllables(s_stone,dohne,negative_s_gap),
   (:normal,   :nw2w) => syllables(s_stone,dome,normal_s_gap),
   (:negative, :nw2w) => syllables(s_stone,dome,negative_s_gap),
+  # REMEMBER: when we add these back in, we need to ensure a multiple of 16 above
   # (:normal,   :w2w) => syllable(s_stone,drum,normal_s_gap),
   # (:negative, :w2w) => syllable(s_stone,drum,negative_s_gap),
   # (:normal,   :nw2nw) => syllable(s_stone,drun,normal_s_gap),
