@@ -1,4 +1,4 @@
-Pkg.add("Weber",v"0.4.2")
+Pkg.add("Weber",v"0.4.4")
 if !isfile("calibrate.jl")
   open("calibrate.jl","w") do s
     println(s,"# call run_calibrate() to select an appropriate attenuation.")
