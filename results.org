@@ -1,44 +1,28 @@
 * Wordstream Results
 ** Setup
-*** loading
-
 #+begin_src R :session
 library(tidyr)
 library(ggplot2)
 library(dplyr)
 source('trial_to_times.R')
 
-file_pat = 'pilot_[0-9]+.*0.3.0_2017.*.csv'
-data1 = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
-data1 = rename(data1,weber_version=psych_version)
-
-file_pat = 'pilot_[0-9]+.*0.3.1_2017.*.csv'
-data2 = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
-data2 = rename(data2,weber_version=psych_version)
-
-data1$presentation = 'int'
-data2$presentation = 'cont'
-
-file_pat = 'pilot_.+.*0.3.2_2017.*.csv'
-data3 = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
-
-data = rbind(data1,data2,data3)
-
+file_pat = 'pilot_02[0-9]+.*_2017.*.csv'
+data = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
 #+end_src
 
 #+RESULTS:
 
 ** Individual Time course
 
-#+begin_src R :session
+#+begin_src R :session :results output silent
 by_time = data %>%
   filter(code %in% c('stimulus','stream_1','stream_2')) %>%
-  group_by(sid,presentation,trial) %>%
+  group_by(sid,trial) %>%
   do(trial_to_times(.,max_seconds=50))
 
 by_context = by_time %>%
 	filter(response > 0) %>%
-	group_by(sid,presentation,time,stimulus,context) %>%
+	group_by(sid,time,stimulus,context) %>%
 	summarise(response = mean(response-1),N = length(response))
 
 #+end_src
@@ -48,7 +32,7 @@ for(num in unique(by_time$sid)){
   legend = guide_legend(title='Context Stimulus')
   ggplot(subset(by_context,sid == num),
          aes(x=time,y=response,color=context,group=context)) +
-    geom_line() + facet_wrap(presentation~stimulus) +
+    geom_line() + facet_wrap(~stimulus) +
     geom_hline(yintercept=0.5,linetype=2) +
     theme_classic() + ylab('% streaming') + xlab('time (s)')
   ggsave(paste('plots/ind_',num,'_',Sys.Date(),'.pdf',sep=''))
@@ -59,137 +43,28 @@ for(num in unique(by_time$sid)){
 
 ** Mean Responses
 
-#+begin_src R :session
+#+begin_src R :session :file 1.png :results value graphics
   responses = data %>%
     filter(trial >= 1,
-           sid %in% c(11,'david','abin'),
            code %in% c('trial_start','stimulus','stream_1','stream_2')) %>%
-    group_by(sid,trial,presentation) %>%
+    group_by(sid,trial) %>%
     filter(length(stimulus[code=='stimulus']) > 0) %>%
     mutate(stimulus=first(stimulus[code=='stimulus']),
            spacing=first(spacing[code=='stimulus'])) %>%
     filter(code != 'stimulus',stimulus %in% c('w2nw','nw2w')) %>%
-    group_by(sid,presentation) %>%
+    group_by(sid) %>%
     filter(code != lag(code) | trial != lag(trial)) %>%
     mutate(length = time - lag(time),
            response=as.numeric(code == 'stream_2'))
 
   means = responses %>%
-    group_by(sid,stimulus,presentation,trial) %>%
+    group_by(sid,stimulus,trial) %>%
     summarize(prop_streaming = sum(response*length,na.rm=T) / sum(length,na.rm=T),
               switches = length(response))
-#+end_src
 
-#+RESULTS:
-| 11    | nw2w | cont |  6 |  0.377754295625605 | 17 |
-| 11    | nw2w | cont |  7 |  0.257858045359675 | 18 |
-| 11    | nw2w | cont |  8 |  0.358096460218103 | 23 |
-| 11    | nw2w | cont |  9 |  0.427045569105725 | 18 |
-| 11    | nw2w | cont | 10 |  0.565182755153789 | 18 |
-| 11    | nw2w | cont | 26 | 0.0183790918927556 | 12 |
-| 11    | nw2w | cont | 27 |   0.38912267743657 | 11 |
-| 11    | nw2w | cont | 28 |  0.303563748419727 | 12 |
-| 11    | nw2w | cont | 29 |  0.390822445492413 |  8 |
-| 11    | nw2w | cont | 30 |  0.415770261003667 |  5 |
-| 11    | nw2w | cont | 56 | 0.0132632472359637 |  3 |
-| 11    | nw2w | cont | 57 |  0.147433767718744 | 11 |
-| 11    | nw2w | cont | 58 |  0.453348775183895 |  7 |
-| 11    | nw2w | cont | 59 |  0.182594060737858 |  5 |
-| 11    | nw2w | cont | 60 |  0.351408534527956 | 12 |
-| 11    | nw2w | cont | 66 |  0.317816972637063 |  5 |
-| 11    | nw2w | cont | 67 |   0.26456099646793 |  7 |
-| 11    | nw2w | cont | 68 |                  0 |  2 |
-| 11    | nw2w | cont | 69 |  0.331498789053666 |  4 |
-| 11    | nw2w | cont | 70 |  0.362567107282371 |  3 |
-| 11    | w2nw | cont | 11 | 0.0513961634473074 |  3 |
-| 11    | w2nw | cont | 12 |  0.307209795869139 |  6 |
-| 11    | w2nw | cont | 13 |  0.345474511758284 |  5 |
-| 11    | w2nw | cont | 14 |  0.296532447115456 |  6 |
-| 11    | w2nw | cont | 15 |  0.181083882597705 | 10 |
-| 11    | w2nw | cont | 36 |  0.108312221098162 |  6 |
-| 11    | w2nw | cont | 37 |  0.467636424717958 |  9 |
-| 11    | w2nw | cont | 38 |  0.365901801334376 | 14 |
-| 11    | w2nw | cont | 39 |  0.392586371278079 | 10 |
-| 11    | w2nw | cont | 40 |  0.597370896947901 | 10 |
-| 11    | w2nw | cont | 61 | 0.0144618184641862 |  4 |
-| 11    | w2nw | cont | 62 |  0.271883512479607 |  3 |
-| 11    | w2nw | cont | 63 |  0.652824419767174 |  3 |
-| 11    | w2nw | cont | 64 | 0.0183613340289972 |  3 |
-| 11    | w2nw | cont | 65 |  0.245876297671148 |  6 |
-| 11    | w2nw | cont | 71 |  0.157438765983246 |  5 |
-| 11    | w2nw | cont | 72 |  0.789871515936366 |  5 |
-| 11    | w2nw | cont | 73 |  0.386571709518029 | 10 |
-| 11    | w2nw | cont | 74 |  0.695182768565182 |  8 |
-| 11    | w2nw | cont | 75 |  0.249765082694279 | 11 |
-| abin  | nw2w | cont |  2 |  0.393330846702745 | 14 |
-| abin  | nw2w | cont |  3 |   0.22125543734026 | 12 |
-| abin  | nw2w | cont |  5 |  0.277089717705058 |  9 |
-| abin  | nw2w | cont |  7 |  0.425858006727032 | 11 |
-| abin  | nw2w | int  |  1 |  0.329797270190091 |  5 |
-| abin  | nw2w | int  |  2 |  0.440181895603605 | 10 |
-| abin  | nw2w | int  |  7 |  0.318841591945432 |  8 |
-| abin  | nw2w | int  |  8 |  0.468244461083668 | 10 |
-| abin  | w2nw | cont |  1 |  0.556208746767418 | 17 |
-| abin  | w2nw | cont |  4 |    0.2711998264859 |  8 |
-| abin  | w2nw | cont |  6 |  0.297465482168214 | 10 |
-| abin  | w2nw | cont |  8 |  0.560046662043259 | 13 |
-| abin  | w2nw | int  |  3 |   0.49076756076798 | 14 |
-| abin  | w2nw | int  |  4 |   0.33193025488329 |  8 |
-| abin  | w2nw | int  |  5 |  0.612802306284985 | 10 |
-| abin  | w2nw | int  |  6 |  0.293629969560184 |  8 |
-| david | nw2w | cont |  1 |  0.222919543777112 | 17 |
-| david | nw2w | cont |  2 |  0.191074823157462 | 15 |
-| david | nw2w | cont |  3 |  0.258604792229588 | 32 |
-| david | nw2w | cont |  4 |  0.407393036660853 | 29 |
-| david | nw2w | cont |  5 |  0.423903451249036 | 30 |
-| david | nw2w | cont |  6 |  0.584036700258543 | 39 |
-| david | nw2w | cont | 19 |  0.258721140395345 | 17 |
-| david | nw2w | cont | 20 |  0.679365235751266 | 23 |
-| david | nw2w | cont | 21 |  0.374225908996464 | 20 |
-| david | nw2w | cont | 22 | 0.0637947387708465 | 20 |
-| david | nw2w | cont | 23 |  0.478818831534621 | 24 |
-| david | nw2w | cont | 24 |  0.446429781615647 | 24 |
-| david | nw2w | int  |  1 |  0.303087280365086 | 11 |
-| david | nw2w | int  |  2 |  0.228875844816672 | 14 |
-| david | nw2w | int  |  3 |  0.256128540345683 |  8 |
-| david | nw2w | int  |  4 |  0.381998999633044 | 11 |
-| david | nw2w | int  |  5 |  0.409356087987784 | 27 |
-| david | nw2w | int  |  6 |    0.4550711661245 | 15 |
-| david | nw2w | int  | 19 |  0.261136474028969 | 16 |
-| david | nw2w | int  | 20 |  0.271646269266425 | 24 |
-| david | nw2w | int  | 21 |  0.321304296084248 | 18 |
-| david | nw2w | int  | 22 |   0.41760593377163 | 30 |
-| david | nw2w | int  | 23 |  0.458846864388059 | 37 |
-| david | nw2w | int  | 24 |  0.482538030119389 | 38 |
-| david | w2nw | cont |  7 |  0.417477490872927 | 37 |
-| david | w2nw | cont |  8 |  0.520271486268845 | 34 |
-| david | w2nw | cont |  9 |  0.476289256346451 | 26 |
-| david | w2nw | cont | 10 |  0.339662467506193 | 23 |
-| david | w2nw | cont | 11 |  0.378461263161499 | 15 |
-| david | w2nw | cont | 12 |  0.298833779779828 | 31 |
-| david | w2nw | cont | 13 |  0.179701452138197 | 23 |
-| david | w2nw | cont | 14 |  0.502137741310262 | 28 |
-| david | w2nw | cont | 15 |  0.438109069006533 | 18 |
-| david | w2nw | cont | 16 |  0.322273293731184 | 16 |
-| david | w2nw | cont | 17 |  0.230264387440832 | 18 |
-| david | w2nw | cont | 18 |  0.372704800071602 | 25 |
-| david | w2nw | int  |  7 |  0.327609663523698 | 29 |
-| david | w2nw | int  |  8 |  0.445498170938495 | 27 |
-| david | w2nw | int  |  9 |   0.32932414049055 | 27 |
-| david | w2nw | int  | 10 |  0.311236989539148 | 12 |
-| david | w2nw | int  | 11 |  0.357466033965088 | 16 |
-| david | w2nw | int  | 12 |  0.449792962867972 |  9 |
-| david | w2nw | int  | 13 |  0.533861201621957 | 19 |
-| david | w2nw | int  | 14 |  0.344569390854104 | 37 |
-| david | w2nw | int  | 15 |  0.517125242785645 | 19 |
-| david | w2nw | int  | 16 |   0.33241098087611 | 18 |
-| david | w2nw | int  | 17 |  0.353177188565648 | 16 |
-| david | w2nw | int  | 18 |  0.533400648553665 | 16 |
-
-#+begin_src R :session :file 1.png :results value graphics
   ggplot(means,aes(x=stimulus,y=prop_streaming,shape=factor(sid),group=factor(sid))) +
     stat_summary(position=position_dodge(width=0.1)) +
-    facet_wrap(~presentation) + theme_classic() + ylab("% time streaming") +
+    theme_classic() + ylab("% time streaming") +
     scale_x_discrete(labels=c('non-word\nto word','word to\nnon-word')) +
     coord_cartesian(ylim=c(0.1,0.9))
 #+end_src
@@ -197,498 +72,54 @@ for(num in unique(by_time$sid)){
 #+RESULTS:
 [[file:1.png]]
 
-#+begin_src R :sessions
-ggsave(paste('mean_streaming,Sys.Date(),'.pdf',sep=''))
+#+begin_src R :session
+ggsave(paste('plots/mean_streaming',Sys.Date(),'.pdf',sep=''))
+#+end_src
+
+#+RESULTS:
+
+** Mean Response Time course
+
+#+begin_src R :session  :results output silent
+  means = by_context %>%
+    group_by(time,stimulus,context) %>%
+    summarise(lower = mean_cl_boot(response,conf.int=0.75)$ymin,
+			  upper = mean_cl_boot(response,conf.int=0.75)$ymax,
+			  response = mean(response))
 #+end_src
 
 #+begin_src R :session :file 2.png :results value graphics
-  ggplot(means,aes(x=stimulus,y=switches,shape=factor(sid),group=factor(sid))) +
-    stat_summary(position=position_dodge(width=0.3)) +
-    facet_wrap(~presentation) + theme_classic() + ylab("# of switches") +
-    scale_x_discrete(labels=c('non-word\nto word','word to\nnon-word'))
+  ggplot(means,aes(x=time,y=response,group=context)) +
+    geom_ribbon(aes(ymin=lower,ymax=upper,y=response,fill=context),
+                alpha=0.6) +
+    geom_line() + facet_wrap(~stimulus) +
+    geom_hline(yintercept=0.5,linetype=2) + xlim(0,40) +
+    theme_classic() + ylab('% streaming') + xlab('time (s)') + ylim(0,1)
 #+end_src
 
 #+RESULTS:
 [[file:2.png]]
-#+begin_src R :sessions
-ggsave(paste('mean_switches,Sys.Date(),'.pdf',sep=''))
-#+end_src
 
-*** switchs split by stream1 -> stream2 and stream2 -> stream1
 
 #+begin_src R :session
-  switch_means = responses %>%
-    group_by(sid,stimulus,code,presentation,trial) %>%
-	filter(code != 'trial_start') %>%
-    summarize(switches = length(response))
+ggsave(paste('plots/means_',Sys.Date(),'.pdf',sep=''))
 #+end_src
 
 #+RESULTS:
-| 11    | nw2w | stream_1 | cont |  6 |  9 |
-| 11    | nw2w | stream_1 | cont |  7 |  8 |
-| 11    | nw2w | stream_1 | cont |  8 | 11 |
-| 11    | nw2w | stream_1 | cont |  9 |  9 |
-| 11    | nw2w | stream_1 | cont | 10 |  8 |
-| 11    | nw2w | stream_1 | cont | 26 |  5 |
-| 11    | nw2w | stream_1 | cont | 27 |  5 |
-| 11    | nw2w | stream_1 | cont | 28 |  6 |
-| 11    | nw2w | stream_1 | cont | 29 |  3 |
-| 11    | nw2w | stream_1 | cont | 30 |  2 |
-| 11    | nw2w | stream_1 | cont | 56 |  1 |
-| 11    | nw2w | stream_1 | cont | 57 |  5 |
-| 11    | nw2w | stream_1 | cont | 58 |  3 |
-| 11    | nw2w | stream_1 | cont | 59 |  2 |
-| 11    | nw2w | stream_1 | cont | 60 |  6 |
-| 11    | nw2w | stream_1 | cont | 66 |  2 |
-| 11    | nw2w | stream_1 | cont | 67 |  3 |
-| 11    | nw2w | stream_1 | cont | 68 |  1 |
-| 11    | nw2w | stream_1 | cont | 69 |  1 |
-| 11    | nw2w | stream_1 | cont | 70 |  1 |
-| 11    | nw2w | stream_2 | cont |  6 |  8 |
-| 11    | nw2w | stream_2 | cont |  7 |  9 |
-| 11    | nw2w | stream_2 | cont |  8 | 11 |
-| 11    | nw2w | stream_2 | cont |  9 |  8 |
-| 11    | nw2w | stream_2 | cont | 10 |  9 |
-| 11    | nw2w | stream_2 | cont | 26 |  6 |
-| 11    | nw2w | stream_2 | cont | 27 |  5 |
-| 11    | nw2w | stream_2 | cont | 28 |  5 |
-| 11    | nw2w | stream_2 | cont | 29 |  4 |
-| 11    | nw2w | stream_2 | cont | 30 |  2 |
-| 11    | nw2w | stream_2 | cont | 56 |  1 |
-| 11    | nw2w | stream_2 | cont | 57 |  5 |
-| 11    | nw2w | stream_2 | cont | 58 |  3 |
-| 11    | nw2w | stream_2 | cont | 59 |  2 |
-| 11    | nw2w | stream_2 | cont | 60 |  5 |
-| 11    | nw2w | stream_2 | cont | 66 |  2 |
-| 11    | nw2w | stream_2 | cont | 67 |  3 |
-| 11    | nw2w | stream_2 | cont | 69 |  2 |
-| 11    | nw2w | stream_2 | cont | 70 |  1 |
-| 11    | w2nw | stream_1 | cont | 11 |  1 |
-| 11    | w2nw | stream_1 | cont | 12 |  2 |
-| 11    | w2nw | stream_1 | cont | 13 |  2 |
-| 11    | w2nw | stream_1 | cont | 14 |  3 |
-| 11    | w2nw | stream_1 | cont | 15 |  4 |
-| 11    | w2nw | stream_1 | cont | 36 |  3 |
-| 11    | w2nw | stream_1 | cont | 37 |  4 |
-| 11    | w2nw | stream_1 | cont | 38 |  7 |
-| 11    | w2nw | stream_1 | cont | 39 |  5 |
-| 11    | w2nw | stream_1 | cont | 40 |  4 |
-| 11    | w2nw | stream_1 | cont | 61 |  2 |
-| 11    | w2nw | stream_1 | cont | 62 |  1 |
-| 11    | w2nw | stream_1 | cont | 63 |  1 |
-| 11    | w2nw | stream_1 | cont | 64 |  1 |
-| 11    | w2nw | stream_1 | cont | 65 |  3 |
-| 11    | w2nw | stream_1 | cont | 71 |  2 |
-| 11    | w2nw | stream_1 | cont | 72 |  2 |
-| 11    | w2nw | stream_1 | cont | 73 |  5 |
-| 11    | w2nw | stream_1 | cont | 74 |  3 |
-| 11    | w2nw | stream_1 | cont | 75 |  5 |
-| 11    | w2nw | stream_2 | cont | 11 |  1 |
-| 11    | w2nw | stream_2 | cont | 12 |  3 |
-| 11    | w2nw | stream_2 | cont | 13 |  2 |
-| 11    | w2nw | stream_2 | cont | 14 |  2 |
-| 11    | w2nw | stream_2 | cont | 15 |  5 |
-| 11    | w2nw | stream_2 | cont | 36 |  2 |
-| 11    | w2nw | stream_2 | cont | 37 |  4 |
-| 11    | w2nw | stream_2 | cont | 38 |  6 |
-| 11    | w2nw | stream_2 | cont | 39 |  4 |
-| 11    | w2nw | stream_2 | cont | 40 |  5 |
-| 11    | w2nw | stream_2 | cont | 61 |  1 |
-| 11    | w2nw | stream_2 | cont | 62 |  1 |
-| 11    | w2nw | stream_2 | cont | 63 |  1 |
-| 11    | w2nw | stream_2 | cont | 64 |  1 |
-| 11    | w2nw | stream_2 | cont | 65 |  2 |
-| 11    | w2nw | stream_2 | cont | 71 |  2 |
-| 11    | w2nw | stream_2 | cont | 72 |  2 |
-| 11    | w2nw | stream_2 | cont | 73 |  4 |
-| 11    | w2nw | stream_2 | cont | 74 |  4 |
-| 11    | w2nw | stream_2 | cont | 75 |  5 |
-| abin  | nw2w | stream_1 | cont |  2 |  7 |
-| abin  | nw2w | stream_1 | cont |  3 |  5 |
-| abin  | nw2w | stream_1 | cont |  5 |  4 |
-| abin  | nw2w | stream_1 | cont |  7 |  5 |
-| abin  | nw2w | stream_1 | int  |  1 |  3 |
-| abin  | nw2w | stream_1 | int  |  2 |  5 |
-| abin  | nw2w | stream_1 | int  |  7 |  3 |
-| abin  | nw2w | stream_1 | int  |  8 |  5 |
-| abin  | nw2w | stream_2 | cont |  2 |  6 |
-| abin  | nw2w | stream_2 | cont |  3 |  6 |
-| abin  | nw2w | stream_2 | cont |  5 |  4 |
-| abin  | nw2w | stream_2 | cont |  7 |  5 |
-| abin  | nw2w | stream_2 | int  |  1 |  2 |
-| abin  | nw2w | stream_2 | int  |  2 |  4 |
-| abin  | nw2w | stream_2 | int  |  7 |  4 |
-| abin  | nw2w | stream_2 | int  |  8 |  4 |
-| abin  | w2nw | stream_1 | cont |  1 |  9 |
-| abin  | w2nw | stream_1 | cont |  4 |  4 |
-| abin  | w2nw | stream_1 | cont |  6 |  4 |
-| abin  | w2nw | stream_1 | cont |  8 |  6 |
-| abin  | w2nw | stream_1 | int  |  3 |  7 |
-| abin  | w2nw | stream_1 | int  |  4 |  3 |
-| abin  | w2nw | stream_1 | int  |  5 |  5 |
-| abin  | w2nw | stream_1 | int  |  6 |  3 |
-| abin  | w2nw | stream_2 | cont |  1 |  8 |
-| abin  | w2nw | stream_2 | cont |  4 |  3 |
-| abin  | w2nw | stream_2 | cont |  6 |  5 |
-| abin  | w2nw | stream_2 | cont |  8 |  6 |
-| abin  | w2nw | stream_2 | int  |  3 |  6 |
-| abin  | w2nw | stream_2 | int  |  4 |  4 |
-| abin  | w2nw | stream_2 | int  |  5 |  4 |
-| abin  | w2nw | stream_2 | int  |  6 |  4 |
-| david | nw2w | stream_1 | cont |  1 |  8 |
-| david | nw2w | stream_1 | cont |  2 |  7 |
-| david | nw2w | stream_1 | cont |  3 | 16 |
-| david | nw2w | stream_1 | cont |  4 | 14 |
-| david | nw2w | stream_1 | cont |  5 | 15 |
-| david | nw2w | stream_1 | cont |  6 | 19 |
-| david | nw2w | stream_1 | cont | 19 |  8 |
-| david | nw2w | stream_1 | cont | 20 | 11 |
-| david | nw2w | stream_1 | cont | 21 |  9 |
-| david | nw2w | stream_1 | cont | 22 |  9 |
-| david | nw2w | stream_1 | cont | 23 | 11 |
-| david | nw2w | stream_1 | cont | 24 | 11 |
-| david | nw2w | stream_1 | int  |  1 |  5 |
-| david | nw2w | stream_1 | int  |  2 |  6 |
-| david | nw2w | stream_1 | int  |  3 |  3 |
-| david | nw2w | stream_1 | int  |  4 |  5 |
-| david | nw2w | stream_1 | int  |  5 | 13 |
-| david | nw2w | stream_1 | int  |  6 |  7 |
-| david | nw2w | stream_1 | int  | 19 |  7 |
-| david | nw2w | stream_1 | int  | 20 | 11 |
-| david | nw2w | stream_1 | int  | 21 |  8 |
-| david | nw2w | stream_1 | int  | 22 | 15 |
-| david | nw2w | stream_1 | int  | 23 | 18 |
-| david | nw2w | stream_1 | int  | 24 | 18 |
-| david | nw2w | stream_2 | cont |  1 |  9 |
-| david | nw2w | stream_2 | cont |  2 |  7 |
-| david | nw2w | stream_2 | cont |  3 | 15 |
-| david | nw2w | stream_2 | cont |  4 | 14 |
-| david | nw2w | stream_2 | cont |  5 | 14 |
-| david | nw2w | stream_2 | cont |  6 | 19 |
-| david | nw2w | stream_2 | cont | 19 |  8 |
-| david | nw2w | stream_2 | cont | 20 | 11 |
-| david | nw2w | stream_2 | cont | 21 | 10 |
-| david | nw2w | stream_2 | cont | 22 | 10 |
-| david | nw2w | stream_2 | cont | 23 | 12 |
-| david | nw2w | stream_2 | cont | 24 | 12 |
-| david | nw2w | stream_2 | int  |  1 |  6 |
-| david | nw2w | stream_2 | int  |  2 |  7 |
-| david | nw2w | stream_2 | int  |  3 |  4 |
-| david | nw2w | stream_2 | int  |  4 |  5 |
-| david | nw2w | stream_2 | int  |  5 | 13 |
-| david | nw2w | stream_2 | int  |  6 |  7 |
-| david | nw2w | stream_2 | int  | 19 |  8 |
-| david | nw2w | stream_2 | int  | 20 | 12 |
-| david | nw2w | stream_2 | int  | 21 |  9 |
-| david | nw2w | stream_2 | int  | 22 | 14 |
-| david | nw2w | stream_2 | int  | 23 | 18 |
-| david | nw2w | stream_2 | int  | 24 | 19 |
-| david | w2nw | stream_1 | cont |  7 | 18 |
-| david | w2nw | stream_1 | cont |  8 | 16 |
-| david | w2nw | stream_1 | cont |  9 | 12 |
-| david | w2nw | stream_1 | cont | 10 | 11 |
-| david | w2nw | stream_1 | cont | 11 |  7 |
-| david | w2nw | stream_1 | cont | 12 | 15 |
-| david | w2nw | stream_1 | cont | 13 | 11 |
-| david | w2nw | stream_1 | cont | 14 | 14 |
-| david | w2nw | stream_1 | cont | 15 |  9 |
-| david | w2nw | stream_1 | cont | 16 |  7 |
-| david | w2nw | stream_1 | cont | 17 |  8 |
-| david | w2nw | stream_1 | cont | 18 | 12 |
-| david | w2nw | stream_1 | int  |  7 | 14 |
-| david | w2nw | stream_1 | int  |  8 | 13 |
-| david | w2nw | stream_1 | int  |  9 | 13 |
-| david | w2nw | stream_1 | int  | 10 |  5 |
-| david | w2nw | stream_1 | int  | 11 |  8 |
-| david | w2nw | stream_1 | int  | 12 |  4 |
-| david | w2nw | stream_1 | int  | 13 |  9 |
-| david | w2nw | stream_1 | int  | 14 | 18 |
-| david | w2nw | stream_1 | int  | 15 |  9 |
-| david | w2nw | stream_1 | int  | 16 |  8 |
-| david | w2nw | stream_1 | int  | 17 |  7 |
-| david | w2nw | stream_1 | int  | 18 |  7 |
-| david | w2nw | stream_2 | cont |  7 | 18 |
-| david | w2nw | stream_2 | cont |  8 | 17 |
-| david | w2nw | stream_2 | cont |  9 | 13 |
-| david | w2nw | stream_2 | cont | 10 | 11 |
-| david | w2nw | stream_2 | cont | 11 |  7 |
-| david | w2nw | stream_2 | cont | 12 | 15 |
-| david | w2nw | stream_2 | cont | 13 | 11 |
-| david | w2nw | stream_2 | cont | 14 | 13 |
-| david | w2nw | stream_2 | cont | 15 |  8 |
-| david | w2nw | stream_2 | cont | 16 |  8 |
-| david | w2nw | stream_2 | cont | 17 |  9 |
-| david | w2nw | stream_2 | cont | 18 | 12 |
-| david | w2nw | stream_2 | int  |  7 | 14 |
-| david | w2nw | stream_2 | int  |  8 | 13 |
-| david | w2nw | stream_2 | int  |  9 | 13 |
-| david | w2nw | stream_2 | int  | 10 |  6 |
-| david | w2nw | stream_2 | int  | 11 |  7 |
-| david | w2nw | stream_2 | int  | 12 |  4 |
-| david | w2nw | stream_2 | int  | 13 |  9 |
-| david | w2nw | stream_2 | int  | 14 | 18 |
-| david | w2nw | stream_2 | int  | 15 |  9 |
-| david | w2nw | stream_2 | int  | 16 |  9 |
-| david | w2nw | stream_2 | int  | 17 |  8 |
-| david | w2nw | stream_2 | int  | 18 |  8 |
 
 #+begin_src R :session :file 3.png :results value graphics
-  ggplot(switch_means,aes(x=stimulus,y=switches,shape=sid,color=code,
-                          group=interaction(code,sid))) +
-    stat_summary(position=position_dodge(width=0.2)) +
-    facet_wrap(~presentation) + theme_classic() + ylab("# of switches") +
-    scale_x_discrete(labels=c('non-word\nto word','word to\nnon-word'))
+  ggplot(means,aes(x=time,y=response,group=stimulus)) +
+    geom_ribbon(aes(ymin=lower,ymax=upper,y=response,fill=stimulus),
+                alpha=0.6) +
+    geom_line() + facet_wrap(~context) +
+    geom_hline(yintercept=0.5,linetype=2) + xlim(0,40) +
+    theme_classic() + ylab('% streaming') + xlab('time (s)') + ylim(0,1)
 #+end_src
 
 #+RESULTS:
 [[file:3.png]]
-
-*** show a rough sense of time course
-
 #+begin_src R :session
-  time_means = responses %>%
-    group_by(sid,presentation) %>%
-    mutate(half = ifelse(trial < max(trial)/2,'first half','second half')) %>%
-    group_by(sid,stimulus,half,presentation,trial) %>%
-    summarize(prop_streaming = sum(response*length,na.rm=T) / sum(length,na.rm=T),
-              switches = length(response))
-#+end_src
-
-#+RESULTS:
-| 11    | nw2w | first half  | cont |  6 |  0.377754295625605 | 17 |
-| 11    | nw2w | first half  | cont |  7 |  0.257858045359675 | 18 |
-| 11    | nw2w | first half  | cont |  8 |  0.358096460218103 | 23 |
-| 11    | nw2w | first half  | cont |  9 |  0.427045569105725 | 18 |
-| 11    | nw2w | first half  | cont | 10 |  0.565182755153789 | 18 |
-| 11    | nw2w | first half  | cont | 26 | 0.0183790918927556 | 12 |
-| 11    | nw2w | first half  | cont | 27 |   0.38912267743657 | 11 |
-| 11    | nw2w | first half  | cont | 28 |  0.303563748419727 | 12 |
-| 11    | nw2w | first half  | cont | 29 |  0.390822445492413 |  8 |
-| 11    | nw2w | first half  | cont | 30 |  0.415770261003667 |  5 |
-| 11    | nw2w | second half | cont | 56 | 0.0132632472359637 |  3 |
-| 11    | nw2w | second half | cont | 57 |  0.147433767718744 | 11 |
-| 11    | nw2w | second half | cont | 58 |  0.453348775183895 |  7 |
-| 11    | nw2w | second half | cont | 59 |  0.182594060737858 |  5 |
-| 11    | nw2w | second half | cont | 60 |  0.351408534527956 | 12 |
-| 11    | nw2w | second half | cont | 66 |  0.317816972637063 |  5 |
-| 11    | nw2w | second half | cont | 67 |   0.26456099646793 |  7 |
-| 11    | nw2w | second half | cont | 68 |                  0 |  2 |
-| 11    | nw2w | second half | cont | 69 |  0.331498789053666 |  4 |
-| 11    | nw2w | second half | cont | 70 |  0.362567107282371 |  3 |
-| 11    | w2nw | first half  | cont | 11 | 0.0513961634473074 |  3 |
-| 11    | w2nw | first half  | cont | 12 |  0.307209795869139 |  6 |
-| 11    | w2nw | first half  | cont | 13 |  0.345474511758284 |  5 |
-| 11    | w2nw | first half  | cont | 14 |  0.296532447115456 |  6 |
-| 11    | w2nw | first half  | cont | 15 |  0.181083882597705 | 10 |
-| 11    | w2nw | first half  | cont | 36 |  0.108312221098162 |  6 |
-| 11    | w2nw | first half  | cont | 37 |  0.467636424717958 |  9 |
-| 11    | w2nw | second half | cont | 38 |  0.365901801334376 | 14 |
-| 11    | w2nw | second half | cont | 39 |  0.392586371278079 | 10 |
-| 11    | w2nw | second half | cont | 40 |  0.597370896947901 | 10 |
-| 11    | w2nw | second half | cont | 61 | 0.0144618184641862 |  4 |
-| 11    | w2nw | second half | cont | 62 |  0.271883512479607 |  3 |
-| 11    | w2nw | second half | cont | 63 |  0.652824419767174 |  3 |
-| 11    | w2nw | second half | cont | 64 | 0.0183613340289972 |  3 |
-| 11    | w2nw | second half | cont | 65 |  0.245876297671148 |  6 |
-| 11    | w2nw | second half | cont | 71 |  0.157438765983246 |  5 |
-| 11    | w2nw | second half | cont | 72 |  0.789871515936366 |  5 |
-| 11    | w2nw | second half | cont | 73 |  0.386571709518029 | 10 |
-| 11    | w2nw | second half | cont | 74 |  0.695182768565182 |  8 |
-| 11    | w2nw | second half | cont | 75 |  0.249765082694279 | 11 |
-| abin  | nw2w | first half  | cont |  2 |  0.393330846702745 | 14 |
-| abin  | nw2w | first half  | cont |  3 |   0.22125543734026 | 12 |
-| abin  | nw2w | first half  | int  |  1 |  0.329797270190091 |  5 |
-| abin  | nw2w | first half  | int  |  2 |  0.440181895603605 | 10 |
-| abin  | nw2w | second half | cont |  5 |  0.277089717705058 |  9 |
-| abin  | nw2w | second half | cont |  7 |  0.425858006727032 | 11 |
-| abin  | nw2w | second half | int  |  7 |  0.318841591945432 |  8 |
-| abin  | nw2w | second half | int  |  8 |  0.468244461083668 | 10 |
-| abin  | w2nw | first half  | cont |  1 |  0.556208746767418 | 17 |
-| abin  | w2nw | first half  | int  |  3 |   0.49076756076798 | 14 |
-| abin  | w2nw | second half | cont |  4 |    0.2711998264859 |  8 |
-| abin  | w2nw | second half | cont |  6 |  0.297465482168214 | 10 |
-| abin  | w2nw | second half | cont |  8 |  0.560046662043259 | 13 |
-| abin  | w2nw | second half | int  |  4 |   0.33193025488329 |  8 |
-| abin  | w2nw | second half | int  |  5 |  0.612802306284985 | 10 |
-| abin  | w2nw | second half | int  |  6 |  0.293629969560184 |  8 |
-| david | nw2w | first half  | cont |  1 |  0.222919543777112 | 17 |
-| david | nw2w | first half  | cont |  2 |  0.191074823157462 | 15 |
-| david | nw2w | first half  | cont |  3 |  0.258604792229588 | 32 |
-| david | nw2w | first half  | cont |  4 |  0.407393036660853 | 29 |
-| david | nw2w | first half  | cont |  5 |  0.423903451249036 | 30 |
-| david | nw2w | first half  | cont |  6 |  0.584036700258543 | 39 |
-| david | nw2w | first half  | int  |  1 |  0.303087280365086 | 11 |
-| david | nw2w | first half  | int  |  2 |  0.228875844816672 | 14 |
-| david | nw2w | first half  | int  |  3 |  0.256128540345683 |  8 |
-| david | nw2w | first half  | int  |  4 |  0.381998999633044 | 11 |
-| david | nw2w | first half  | int  |  5 |  0.409356087987784 | 27 |
-| david | nw2w | first half  | int  |  6 |    0.4550711661245 | 15 |
-| david | nw2w | second half | cont | 19 |  0.258721140395345 | 17 |
-| david | nw2w | second half | cont | 20 |  0.679365235751266 | 23 |
-| david | nw2w | second half | cont | 21 |  0.374225908996464 | 20 |
-| david | nw2w | second half | cont | 22 | 0.0637947387708465 | 20 |
-| david | nw2w | second half | cont | 23 |  0.478818831534621 | 24 |
-| david | nw2w | second half | cont | 24 |  0.446429781615647 | 24 |
-| david | nw2w | second half | int  | 19 |  0.261136474028969 | 16 |
-| david | nw2w | second half | int  | 20 |  0.271646269266425 | 24 |
-| david | nw2w | second half | int  | 21 |  0.321304296084248 | 18 |
-| david | nw2w | second half | int  | 22 |   0.41760593377163 | 30 |
-| david | nw2w | second half | int  | 23 |  0.458846864388059 | 37 |
-| david | nw2w | second half | int  | 24 |  0.482538030119389 | 38 |
-| david | w2nw | first half  | cont |  7 |  0.417477490872927 | 37 |
-| david | w2nw | first half  | cont |  8 |  0.520271486268845 | 34 |
-| david | w2nw | first half  | cont |  9 |  0.476289256346451 | 26 |
-| david | w2nw | first half  | cont | 10 |  0.339662467506193 | 23 |
-| david | w2nw | first half  | cont | 11 |  0.378461263161499 | 15 |
-| david | w2nw | first half  | int  |  7 |  0.327609663523698 | 29 |
-| david | w2nw | first half  | int  |  8 |  0.445498170938495 | 27 |
-| david | w2nw | first half  | int  |  9 |   0.32932414049055 | 27 |
-| david | w2nw | first half  | int  | 10 |  0.311236989539148 | 12 |
-| david | w2nw | first half  | int  | 11 |  0.357466033965088 | 16 |
-| david | w2nw | second half | cont | 12 |  0.298833779779828 | 31 |
-| david | w2nw | second half | cont | 13 |  0.179701452138197 | 23 |
-| david | w2nw | second half | cont | 14 |  0.502137741310262 | 28 |
-| david | w2nw | second half | cont | 15 |  0.438109069006533 | 18 |
-| david | w2nw | second half | cont | 16 |  0.322273293731184 | 16 |
-| david | w2nw | second half | cont | 17 |  0.230264387440832 | 18 |
-| david | w2nw | second half | cont | 18 |  0.372704800071602 | 25 |
-| david | w2nw | second half | int  | 12 |  0.449792962867972 |  9 |
-| david | w2nw | second half | int  | 13 |  0.533861201621957 | 19 |
-| david | w2nw | second half | int  | 14 |  0.344569390854104 | 37 |
-| david | w2nw | second half | int  | 15 |  0.517125242785645 | 19 |
-| david | w2nw | second half | int  | 16 |   0.33241098087611 | 18 |
-| david | w2nw | second half | int  | 17 |  0.353177188565648 | 16 |
-| david | w2nw | second half | int  | 18 |  0.533400648553665 | 16 |
-
-| 11    | nw2w | FALSE | cont | 56 | 0.0132632472359637 |  3 |
-| 11    | nw2w | FALSE | cont | 57 |  0.147433767718744 | 11 |
-| 11    | nw2w | FALSE | cont | 58 |  0.453348775183895 |  7 |
-| 11    | nw2w | FALSE | cont | 59 |  0.182594060737858 |  5 |
-| 11    | nw2w | FALSE | cont | 60 |  0.351408534527956 | 12 |
-| 11    | nw2w | FALSE | cont | 66 |  0.317816972637063 |  5 |
-| 11    | nw2w | FALSE | cont | 67 |   0.26456099646793 |  7 |
-| 11    | nw2w | FALSE | cont | 68 |                  0 |  2 |
-| 11    | nw2w | FALSE | cont | 69 |  0.331498789053666 |  4 |
-| 11    | nw2w | FALSE | cont | 70 |  0.362567107282371 |  3 |
-| 11    | nw2w | TRUE  | cont |  6 |  0.377754295625605 | 17 |
-| 11    | nw2w | TRUE  | cont |  7 |  0.257858045359675 | 18 |
-| 11    | nw2w | TRUE  | cont |  8 |  0.358096460218103 | 23 |
-| 11    | nw2w | TRUE  | cont |  9 |  0.427045569105725 | 18 |
-| 11    | nw2w | TRUE  | cont | 10 |  0.565182755153789 | 18 |
-| 11    | nw2w | TRUE  | cont | 26 | 0.0183790918927556 | 12 |
-| 11    | nw2w | TRUE  | cont | 27 |   0.38912267743657 | 11 |
-| 11    | nw2w | TRUE  | cont | 28 |  0.303563748419727 | 12 |
-| 11    | nw2w | TRUE  | cont | 29 |  0.390822445492413 |  8 |
-| 11    | nw2w | TRUE  | cont | 30 |  0.415770261003667 |  5 |
-| 11    | w2nw | FALSE | cont | 38 |  0.365901801334376 | 14 |
-| 11    | w2nw | FALSE | cont | 39 |  0.392586371278079 | 10 |
-| 11    | w2nw | FALSE | cont | 40 |  0.597370896947901 | 10 |
-| 11    | w2nw | FALSE | cont | 61 | 0.0144618184641862 |  4 |
-| 11    | w2nw | FALSE | cont | 62 |  0.271883512479607 |  3 |
-| 11    | w2nw | FALSE | cont | 63 |  0.652824419767174 |  3 |
-| 11    | w2nw | FALSE | cont | 64 | 0.0183613340289972 |  3 |
-| 11    | w2nw | FALSE | cont | 65 |  0.245876297671148 |  6 |
-| 11    | w2nw | FALSE | cont | 71 |  0.157438765983246 |  5 |
-| 11    | w2nw | FALSE | cont | 72 |  0.789871515936366 |  5 |
-| 11    | w2nw | FALSE | cont | 73 |  0.386571709518029 | 10 |
-| 11    | w2nw | FALSE | cont | 74 |  0.695182768565182 |  8 |
-| 11    | w2nw | FALSE | cont | 75 |  0.249765082694279 | 11 |
-| 11    | w2nw | TRUE  | cont | 11 | 0.0513961634473074 |  3 |
-| 11    | w2nw | TRUE  | cont | 12 |  0.307209795869139 |  6 |
-| 11    | w2nw | TRUE  | cont | 13 |  0.345474511758284 |  5 |
-| 11    | w2nw | TRUE  | cont | 14 |  0.296532447115456 |  6 |
-| 11    | w2nw | TRUE  | cont | 15 |  0.181083882597705 | 10 |
-| 11    | w2nw | TRUE  | cont | 36 |  0.108312221098162 |  6 |
-| 11    | w2nw | TRUE  | cont | 37 |  0.467636424717958 |  9 |
-| abin  | nw2w | FALSE | cont |  5 |  0.277089717705058 |  9 |
-| abin  | nw2w | FALSE | cont |  7 |  0.425858006727032 | 11 |
-| abin  | nw2w | FALSE | int  |  7 |  0.318841591945432 |  8 |
-| abin  | nw2w | FALSE | int  |  8 |  0.468244461083668 | 10 |
-| abin  | nw2w | TRUE  | cont |  2 |  0.393330846702745 | 14 |
-| abin  | nw2w | TRUE  | cont |  3 |   0.22125543734026 | 12 |
-| abin  | nw2w | TRUE  | int  |  1 |  0.329797270190091 |  5 |
-| abin  | nw2w | TRUE  | int  |  2 |  0.440181895603605 | 10 |
-| abin  | w2nw | FALSE | cont |  4 |    0.2711998264859 |  8 |
-| abin  | w2nw | FALSE | cont |  6 |  0.297465482168214 | 10 |
-| abin  | w2nw | FALSE | cont |  8 |  0.560046662043259 | 13 |
-| abin  | w2nw | FALSE | int  |  4 |   0.33193025488329 |  8 |
-| abin  | w2nw | FALSE | int  |  5 |  0.612802306284985 | 10 |
-| abin  | w2nw | FALSE | int  |  6 |  0.293629969560184 |  8 |
-| abin  | w2nw | TRUE  | cont |  1 |  0.556208746767418 | 17 |
-| abin  | w2nw | TRUE  | int  |  3 |   0.49076756076798 | 14 |
-| david | nw2w | FALSE | cont | 19 |  0.258721140395345 | 17 |
-| david | nw2w | FALSE | cont | 20 |  0.679365235751266 | 23 |
-| david | nw2w | FALSE | cont | 21 |  0.374225908996464 | 20 |
-| david | nw2w | FALSE | cont | 22 | 0.0637947387708465 | 20 |
-| david | nw2w | FALSE | cont | 23 |  0.478818831534621 | 24 |
-| david | nw2w | FALSE | cont | 24 |  0.446429781615647 | 24 |
-| david | nw2w | FALSE | int  | 19 |  0.261136474028969 | 16 |
-| david | nw2w | FALSE | int  | 20 |  0.271646269266425 | 24 |
-| david | nw2w | FALSE | int  | 21 |  0.321304296084248 | 18 |
-| david | nw2w | FALSE | int  | 22 |   0.41760593377163 | 30 |
-| david | nw2w | FALSE | int  | 23 |  0.458846864388059 | 37 |
-| david | nw2w | FALSE | int  | 24 |  0.482538030119389 | 38 |
-| david | nw2w | TRUE  | cont |  1 |  0.222919543777112 | 17 |
-| david | nw2w | TRUE  | cont |  2 |  0.191074823157462 | 15 |
-| david | nw2w | TRUE  | cont |  3 |  0.258604792229588 | 32 |
-| david | nw2w | TRUE  | cont |  4 |  0.407393036660853 | 29 |
-| david | nw2w | TRUE  | cont |  5 |  0.423903451249036 | 30 |
-| david | nw2w | TRUE  | cont |  6 |  0.584036700258543 | 39 |
-| david | nw2w | TRUE  | int  |  1 |  0.303087280365086 | 11 |
-| david | nw2w | TRUE  | int  |  2 |  0.228875844816672 | 14 |
-| david | nw2w | TRUE  | int  |  3 |  0.256128540345683 |  8 |
-| david | nw2w | TRUE  | int  |  4 |  0.381998999633044 | 11 |
-| david | nw2w | TRUE  | int  |  5 |  0.409356087987784 | 27 |
-| david | nw2w | TRUE  | int  |  6 |    0.4550711661245 | 15 |
-| david | w2nw | FALSE | cont | 12 |  0.298833779779828 | 31 |
-| david | w2nw | FALSE | cont | 13 |  0.179701452138197 | 23 |
-| david | w2nw | FALSE | cont | 14 |  0.502137741310262 | 28 |
-| david | w2nw | FALSE | cont | 15 |  0.438109069006533 | 18 |
-| david | w2nw | FALSE | cont | 16 |  0.322273293731184 | 16 |
-| david | w2nw | FALSE | cont | 17 |  0.230264387440832 | 18 |
-| david | w2nw | FALSE | cont | 18 |  0.372704800071602 | 25 |
-| david | w2nw | FALSE | int  | 12 |  0.449792962867972 |  9 |
-| david | w2nw | FALSE | int  | 13 |  0.533861201621957 | 19 |
-| david | w2nw | FALSE | int  | 14 |  0.344569390854104 | 37 |
-| david | w2nw | FALSE | int  | 15 |  0.517125242785645 | 19 |
-| david | w2nw | FALSE | int  | 16 |   0.33241098087611 | 18 |
-| david | w2nw | FALSE | int  | 17 |  0.353177188565648 | 16 |
-| david | w2nw | FALSE | int  | 18 |  0.533400648553665 | 16 |
-| david | w2nw | TRUE  | cont |  7 |  0.417477490872927 | 37 |
-| david | w2nw | TRUE  | cont |  8 |  0.520271486268845 | 34 |
-| david | w2nw | TRUE  | cont |  9 |  0.476289256346451 | 26 |
-| david | w2nw | TRUE  | cont | 10 |  0.339662467506193 | 23 |
-| david | w2nw | TRUE  | cont | 11 |  0.378461263161499 | 15 |
-| david | w2nw | TRUE  | int  |  7 |  0.327609663523698 | 29 |
-| david | w2nw | TRUE  | int  |  8 |  0.445498170938495 | 27 |
-| david | w2nw | TRUE  | int  |  9 |   0.32932414049055 | 27 |
-| david | w2nw | TRUE  | int  | 10 |  0.311236989539148 | 12 |
-| david | w2nw | TRUE  | int  | 11 |  0.357466033965088 | 16 |
-
-#+begin_src R :session :file 4.png :results value graphics
-  ggplot(time_means,aes(x=stimulus,y=switches,shape=sid,group=sid)) +
-    stat_summary(position=position_dodge(width=0.2)) +
-    facet_wrap(half~presentation) + theme_classic() + ylab("# of switches") +
-    scale_x_discrete(labels=c('non-word\nto word','word to\nnon-word'))
-#+end_src
-
-#+RESULTS:
-[[file:4.png]]
-
-
-** Mean Response Time course
-
-#+begin_src R :session
-means = by_context %>%
-  group_by(time,stimulus,context) %>%
-  summarise(response = mean(response))
-
-ggplot(means,
-       aes(x=time,y=response,color=context,group=context)) +
-	geom_line() + facet_wrap(~stimulus) +
-  geom_hline(yintercept=0.5,linetype=2) +
-	theme_classic() + ylab('% streaming') + xlab('time (s)')
-ggsave(paste('plots/means_',Sys.Date(),'.pdf',sep=''))
+ggsave(paste('plots/means_by_stimulus_',Sys.Date(),'.pdf',sep=''))
 #+end_src
 
 #+RESULTS:
