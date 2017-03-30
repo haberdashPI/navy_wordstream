@@ -9,7 +9,11 @@ Billig, A. J., Davis, M. H., Deeks, J. M., Monstrey, J., & Carlyon,
 R. P. (2013). Lexical Influences on Auditory Streaming. Current Biology, 23(16),
 1585–1589. https://doi.org/10.1016/j.cub.2013.06.042
 
-# Installation
+# Analysis
+
+All analysese are located under anlaysis: it's pretty disorganized right now.
+
+# Running the experiment
 
 You need to install julia, and then run the setup.jl script.
 
@@ -21,8 +25,6 @@ One way to do this is as follows:
    [install Juno](https://github.com/JunoLab/uber-juno/blob/master/setup.md)
 3. Open the setup.jl file for this project in Juno.
 4. Run setup.jl in Juno (e.g. Julia > Run File).
-
-# Running
 
 If you installed Juno (see above) just run `run_wordstream.jl` in Juno.  Make
 sure you have the console open (Julia > Open Console), as you will be prompted

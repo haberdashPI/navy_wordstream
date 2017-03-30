@@ -1,4 +1,4 @@
-trial_to_times = function(trial,max_seconds=NA,
+trial_to_times = function(trial,max_seconds,
                           times=seq(0,max_seconds,length.out=100)){
 
   if(any(trial$phase %in% c('practice','example'))) return(data.frame())
@@ -16,12 +16,15 @@ trial_to_times = function(trial,max_seconds=NA,
   if(nrow(responses) > 0 && trial_duration < max_seconds){
     response_times = rep(0,length(times))
     for(r in 1:nrow(responses)){
-      index = round((responses[r,]$time - start_time) /
-                    max_seconds * length(times))
+      index = max(1,round((responses[r,]$time - start_time) /
+                          max_seconds * length(times)))
 
       response_times[old_index:index] = old_code
-      if(responses[r,]$code == 'stream_1') old_code = 1
-      else old_code = 2
+      if(responses[r,]$code == 'stream_1'){
+        old_code = 1
+      }else{
+        old_code = 2
+      }
       old_index = index
     }
 
