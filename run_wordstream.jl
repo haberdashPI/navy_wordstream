@@ -7,7 +7,7 @@ using Lazy
 
 include("calibrate.jl")
 
-version = v"0.3.4"
+version = v"0.4.0"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 #sid,trial_skip = "test",0
 
@@ -81,6 +81,7 @@ stimuli = Dict(
   (:normal,   :nw2w) => syllables(s_stone,dome,normal_s_gap),
   (:negative, :nw2w) => syllables(s_stone,dome,negative_s_gap),
   # REMEMBER: when we add these back in, we need to ensure a multiple of 16 above
+  # FOR NOW: we've decided not to use these control conditions.
   # (:normal,   :w2w) => syllable(s_stone,drum,normal_s_gap),
   # (:negative, :w2w) => syllable(s_stone,drum,negative_s_gap),
   # (:normal,   :nw2nw) => syllable(s_stone,drun,normal_s_gap),
@@ -114,8 +115,6 @@ If you hear "strun" press "Q". If you hear "drun" press "P".
 order = [keys(stimuli) |> collect |> shuffle,
          keys(stimuli) |> collect |> shuffle]
 
-stream_1 = key"q"
-stream_2 = key"p"
 isresponse(e) = iskeydown(e,stream_2) || iskeydown(e,stream_1)
 
 ################################################################################
@@ -160,16 +159,10 @@ setup(exp) do
   blank = moment(display,colorant"gray")
 
   addbreak(
-    instruct("""
-
-      In each trial of the present experiment you will listen to the same word
-      or a non-word repeated over and over. Over time the sound of this word or
-      non-word may (or may not) appear to change."""),
-    instruct("""
-
-      For example the word "stone" may begin to sound like an "s" that is
-      separate from a second, "dohne" sound. See if you can hear the sound
-      "stone" change to the sound "dohne" in the following example."""))
+    moment(display,load("images/instruct_01.png")),
+    await_response(iskeydown(end_break_key)),
+    moment(display,load("images/instruct_02.png")),
+    await_response(iskeydown(end_break_key)))
 
   addpractice(blank,show_cross(),
               repeated([moment(play,stimuli[:normal,:w2nw]),
@@ -178,38 +171,23 @@ setup(exp) do
                        round(Int,n_repeat_example/3)),
               moment(SOA))
 
+
   addbreak(
-    instruct("""
-
-      In this experiment we'll be asking you to listen for whether it appears
-      that the begining "s" of a sound is a part of the following sound or
-      separate from it."""),
-    instruct("""
-
-      So, for example, if the word presented is "stone" we
-      want to know if you hear "stone" or "dohne". There may be
-      other changes to the sound that you hear; please ignore them."""),
-    instruct("""
-
-      After several sounds, we want you to indicate what you heard. Let's
-      practice a bit.  Use "Q" to indicate that you heard the "s" as part of the
-      sound all of the time and "P" if you heard the "s" as separate at any
-      point. Respond as promptly as you can."""))
+    moment(display,load("images/instruct_03.png")),
+    await_response(iskeydown(end_break_key)),
+    moment(display,load("images/instruct_04.png")),
+    await_response(iskeydown(end_break_key)),
+    moment(display,load("images/instruct_05.png")),
+    await_response(iskeydown(end_break_key)),
+    moment(display,load("images/instruct_06.png")),
+    await_response(iskeydown(end_break_key)))
 
   addpractice(practice_trial(:normal,:w2nw,10response_spacing,phase="practice"))
 
-  addbreak(instruct("""
-
-    In the real experiment, your time to respond will be limited. Let's
-    try another practice round, this time a little bit faster.
-  """) )
+  addbreak(moment(display,"Let's try a few more practice trials..."),
+           await_response(iskeydown(end_break_key)))
 
   addpractice(practice_trial(:normal,:w2nw,2response_spacing,phase="practice"))
-
-  addbreak(instruct("""
-
-    During the real expeirment, try to respond before the next trial begins, but
-    even if you don't please still respond."""))
 
   anykey = moment(display,"Hit any key to start the real experiment...")
   addbreak(anykey,await_response(iskeydown))
