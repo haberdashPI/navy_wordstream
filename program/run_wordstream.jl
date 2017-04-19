@@ -15,6 +15,7 @@ sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 exp = Experiment(
   moment_resolution = moment_resolution,
   skip=trial_skip,
+  data_dir=joinpath("..","data","csv"),
   columns = [
     :condition => "pilot",
     :sid => sid,
