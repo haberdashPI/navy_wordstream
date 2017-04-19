@@ -6,8 +6,9 @@ using Weber
 using Lazy
 
 include("calibrate.jl")
+include("stimtrak.jl")
 
-version = v"0.4.0"
+version = v"0.4.1"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 #sid,trial_skip = "test",0
 
@@ -195,6 +196,8 @@ setup(exp) do
   n_blocks = length(keys(stimuli))
   n_repeats = div(n_trials,2length(keys(stimuli)))
   n_breaks = 2*n_blocks - 1
+
+  marker = moment(record,"experiment_start")
   for half in 1:2
     for block in 1:n_blocks
       context,word = order[half][block]
@@ -206,6 +209,7 @@ setup(exp) do
       else
         addbreak(instruct(stimulus_description[word],clean_whitespace=false))
       end
+      marker = moment(record,"block_start")
 
       for i in 1:n_repeats
         context_phase = real_trial(context,word,phase="context",
@@ -213,7 +217,8 @@ setup(exp) do
         test_phase = real_trial(:normal,word,phase="test",
                                 spacing=context,stimulus=word)
 
-        addtrial(context_phase,test_phase)
+        addtrial(marker,context_phase,test_phase)
+        marker = moment()
       end
     end
   end
