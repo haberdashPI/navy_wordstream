@@ -1,9 +1,10 @@
 #!/usr/bin/env julia
 
-# NOTE: record mispressed keys
-
 using Weber
+using WeberCedrus
 using Lazy
+
+# NOTE: offset 9 skips all the practice trials
 
 include("calibrate.jl")
 include("stimtrak.jl")
@@ -21,7 +22,8 @@ exp = Experiment(
     :sid => sid,
     :version => version,
     :stimulus,:spacing,:phase
-  ]
+  ],
+  extensions = [stimtrak(stimtrak_port), Cedrus()]
 )
 
 const ms = 1/1000
