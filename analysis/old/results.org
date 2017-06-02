@@ -7,7 +7,8 @@ library(dplyr)
 source('trial_to_times.R')
 
 file_pat = 'pilot_02[0-9]+.*_2017.*.csv'
-data = Reduce(rbind,Map(read.csv,list.files('data',file_pat,full.names=T)))
+data = Reduce(rbind,Map(read.csv,
+						list.files('../../data/csv',file_pat,full.names=T)))
 #+end_src
 
 #+RESULTS:
@@ -35,7 +36,7 @@ for(num in unique(by_time$sid)){
     geom_line() + facet_wrap(~stimulus) +
     geom_hline(yintercept=0.5,linetype=2) +
     theme_classic() + ylab('% streaming') + xlab('time (s)')
-  ggsave(paste('plots/ind_',num,'_',Sys.Date(),'.pdf',sep=''))
+  ggsave(paste('../../plots/ind_',num,'_',Sys.Date(),'.pdf',sep=''))
 }
 #+end_src
 
@@ -73,7 +74,7 @@ for(num in unique(by_time$sid)){
 [[file:1.png]]
 
 #+begin_src R :session
-ggsave(paste('plots/mean_streaming',Sys.Date(),'.pdf',sep=''))
+ggsave(paste('../../plots/mean_streaming',Sys.Date(),'.pdf',sep=''))
 #+end_src
 
 #+RESULTS:
@@ -102,7 +103,29 @@ ggsave(paste('plots/mean_streaming',Sys.Date(),'.pdf',sep=''))
 
 
 #+begin_src R :session
-ggsave(paste('plots/means_',Sys.Date(),'.pdf',sep=''))
+ggsave(paste('../../plots/means_',Sys.Date(),'.pdf',sep=''))
+#+end_src
+
+*** Version for navy report
+
+#+RESULTS:
+
+#+begin_src R :session :file 2b.png :results value graphics
+  ggplot(means,aes(x=time,y=response,group=context)) +
+    geom_line(aes(ymin=lower,ymax=upper,y=response,color=context),size=1) +
+	scale_color_brewer(palette='Set1') +
+	facet_wrap(~stimulus) +
+    geom_hline(yintercept=0.5,linetype=2) + xlim(0,40) +
+    theme_classic(base_size=22) +
+	ylab('% streaming') +
+	xlab('time (s)') + ylim(0,1)
+#+end_src
+
+#+RESULTS:
+[[file:2b.png]]
+
+#+begin_src R :session
+ggsave(paste('../../plots/means_for_navy_',Sys.Date(),'.pdf',sep=''))
 #+end_src
 
 #+RESULTS:
@@ -119,7 +142,7 @@ ggsave(paste('plots/means_',Sys.Date(),'.pdf',sep=''))
 #+RESULTS:
 [[file:3.png]]
 #+begin_src R :session
-ggsave(paste('plots/means_by_stimulus_',Sys.Date(),'.pdf',sep=''))
+ggsave(paste('../../plots/means_by_stimulus_',Sys.Date(),'.pdf',sep=''))
 #+end_src
 
 #+RESULTS:
