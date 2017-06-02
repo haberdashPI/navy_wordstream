@@ -24,8 +24,6 @@ exp = Experiment(
                 @Cedrus()]
 )
 
-const ms = 1/1000
-
 ################################################################################
 # settings
 
@@ -66,12 +64,12 @@ dB_s = -20log10(rms(s_stone) / rms(dohne))
 # generate a syllable with a given spacing between the "s" and the remainder of the syllable
 function syllables(a,b,gap)
   x = mix(attenuate(a,atten_dB+dB_s),
-          [silence(duration(a)+gap); attenuate(b,atten_dB)])
+          [silence(duration(a)+gap); attenuate(b,atten_dB)[:]])
 
   xs = silence(SOA*stimuli_per_response)
   for i in 1:stimuli_per_response
-    at = round(Int,(i-1)*SOA*samplerate(x))+1
-    xs[at:(at+size(x,1)-1)] = x
+    at = (i-1)*SOA
+    xs[at .. (at + duration(x))] = x
   end
 
   xs

@@ -6,7 +6,7 @@ manual_start_record = 0x29
 # NOTE: we use powers of two for the codes so that we can identify codes that
 # occur at the same time: e.g. 2^0 + 2^5 would indicate that the stream_1 button
 # was pressed at the same time that a normal nw2w stimulus began to play.
-stim_trak_codes = Dict(
+stimtrak_codes = Dict(
   "trial_start" => start_record,
   "break_start" => stop_record,
   "paused" => stop_record,
