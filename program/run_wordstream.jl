@@ -1,15 +1,12 @@
 #!/usr/bin/env julia
 
 using Weber
-using WeberCedrus
-using Lazy
-
 # NOTE: offset 9 skips all the practice trials
 
 include("calibrate.jl")
 include("stimtrak.jl")
 
-version = v"0.4.1"
+version = v"0.4.2"
 sid,trial_skip = @read_args("Runs a wordstream experiment, version $version.")
 #sid,trial_skip = "test",0
 
@@ -23,7 +20,8 @@ exp = Experiment(
     :version => version,
     :stimulus,:spacing,:phase
   ],
-  extensions = [stimtrak(stimtrak_port), Cedrus()]
+  extensions = [@DAQmx(stimtrak_port,codes=stimtrak_codes,eeg_sample_rate=512),
+                @Cedrus()]
 )
 
 const ms = 1/1000
@@ -35,19 +33,18 @@ const ms = 1/1000
 #
 # Each *trial* is divided into two phases: a context phase and a test phase
 # Each *phase* is dividied up into one more presentations.
-# Each *presentation* consists of a series of stimuli, and one or more
-# responses to those stimuli.
+# Each *presentation* consists of three stimuli, and one response to those stimuli
 
 # when the sid is the same, the randomization should be the same
 randomize_by(sid)
 
 SOA = 672.5ms
 practice_spacing = 250ms
+n_repeat_example = 20
 response_spacing = 200ms
 n_trials = 72 # needs to be a multiple of 8 (= n stimuli x n halves)
-n_repeat_example = 20
-stimuli_per_response = 3
 responses_per_phase = 9
+stimuli_per_response = 3
 
 normal_s_gap = 41ms
 negative_s_gap = -41ms
@@ -56,16 +53,17 @@ if n_trials % 8 != 0
   error("n_trials must be a multiple of 8")
 end
 
-s_stone = load("sounds/s_stone.wav")
-dohne = load("sounds/dohne.wav")
-dome = load("sounds/dome.wav")
-drun = load("sounds/drun.wav")
-drum = load("sounds/drum.wav")
+s_stone = sound("sounds/s_stone.wav")
+dohne = sound("sounds/dohne.wav")
+dome = sound("sounds/dome.wav")
+drun = sound("sounds/drun.wav")
+drum = sound("sounds/drum.wav")
 
 # what is the dB difference between the s and the dohne?
 rms(x) = sqrt(mean(x.^2))
 dB_s = -20log10(rms(s_stone) / rms(dohne))
 
+# generate a syllable with a given spacing between the "s" and the remainder of the syllable
 function syllables(a,b,gap)
   x = mix(attenuate(a,atten_dB+dB_s),
           [silence(duration(a)+gap); attenuate(b,atten_dB)])
@@ -96,22 +94,22 @@ stimulus_description = Dict(
   :w2nw => """
 In what follows you will be presented the sound "stone".
 
-If you hear "stone" press "Q". If you hear "dohne" press "P".
+If you hear "stone" press "yellow". If you hear "dohne" press "orange".
 """,
   :nw2w => """
 In what follows you will be presented the sound "stome".
 
-If you hear "stome" press "Q". If you hear "dome" press "P".
+If you hear "stome" press "yellow". If you hear "dome" press "orange".
 """,
   :w2w => """
 In what follows you will be presented the sound "strum".
 
-If you hear "strum" press "Q". If you hear "drum" press "P".
+If you hear "strum" press "yellow". If you hear "drum" press "orange".
 """,
   :nw2nw => """
 In what follows you will be presented the sound "strun".
 
-If you hear "strun" press "Q". If you hear "drun" press "P".
+If you hear "strun" press "yellow". If you hear "drun" press "orange".
 """
 )
 
@@ -119,7 +117,7 @@ If you hear "strun" press "Q". If you hear "drun" press "P".
 order = [keys(stimuli) |> collect |> shuffle,
          keys(stimuli) |> collect |> shuffle]
 
-isresponse(e) = iskeydown(e,stream_2) || iskeydown(e,stream_1)
+isresponse(e) = iskeydown(e,stream_1) || iskeydown(e,stream_2)
 
 ################################################################################
 # trial defintions
@@ -128,29 +126,31 @@ isresponse(e) = iskeydown(e,stream_2) || iskeydown(e,stream_1)
 function practice_trial(spacing,stimulus,limit;info...)
   resp = response(stream_1 => "stream_1",stream_2 => "stream_2";info...)
 
-  go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
   waitlen = SOA*stimuli_per_response+limit
-  min_wait = SOA*stimuli_per_response
+  min_wait = SOA*stimuli_per_response+practice_spacing
+
+  go_faster = visual("Faster!",size=50,duration=500ms,y=0.15,priority=1)
   await = timeout(isresponse,waitlen,atleast=min_wait) do
-    record("response_timeout";info...)
     display(go_faster)
   end
 
-  x = [resp,show_cross(),
-       moment(play,stimuli[spacing,stimulus]),
-       moment(record,"stimulus";info...),
-       await,moment(practice_spacing)]
-  repeat(x,outer=responses_per_phase)
+  one_response = [resp,show_cross(),
+                  moment(play,stimuli[spacing,stimulus]),
+                  moment(record,"stimulus_"string(spacing)"_"string(stimulus);info...),
+                  await]
+  fill(one_response,responses_per_phase)
 end
 
 # in the real trials the presentations are continuous and do not wait for
 # responses
 function real_trial(spacing,stimulus;info...)
   resp = response(stream_1 => "stream_1",stream_2 => "stream_2";info...)
-  x = [resp,moment(play,stimuli[spacing,stimulus]),
-       moment(record,"stimulus";info...),show_cross(),
-       moment(SOA*stimuli_per_response+response_spacing)]
-  repeat(x,outer=responses_per_phase)
+  one_response = [resp,moment(play,stimuli[spacing,stimulus]),
+                  moment(record,"stimulus_"string(spacing)"_"string(stimulus);
+                         info...),
+                  show_cross(),
+                  moment(SOA*stimuli_per_response+response_spacing)]
+  fill(one_response,responses_per_phase)
 end
 
 ################################################################################
@@ -163,27 +163,27 @@ setup(exp) do
   blank = moment(display,colorant"gray")
 
   addbreak(
-    moment(display,load("images/instruct_01.png")),
+    moment(display,"images/instruct_01.png"),
     await_response(iskeydown(end_break_key)),
-    moment(display,load("images/instruct_02.png")),
+    moment(display,"images/instruct_02.png"),
     await_response(iskeydown(end_break_key)))
 
   addpractice(blank,show_cross(),
-              repeated([moment(play,stimuli[:normal,:w2nw]),
-                        moment(record,"stimulus",phase="example"),
-                        moment(3SOA)],
-                       round(Int,n_repeat_example/3)),
+              fill([moment(play,stimuli[:normal,:w2nw]),
+                    moment(record,"stimulus",phase="example"),
+                    moment(3SOA)],
+                   round(Int,n_repeat_example/3)),
               moment(SOA))
 
 
   addbreak(
-    moment(display,load("images/instruct_03.png")),
+    moment(display,"images/instruct_03.png"),
     await_response(iskeydown(end_break_key)),
-    moment(display,load("images/instruct_04.png")),
+    moment(display,"images/instruct_04.png"),
     await_response(iskeydown(end_break_key)),
-    moment(display,load("images/instruct_05.png")),
+    moment(display,"images/instruct_05.png"),
     await_response(iskeydown(end_break_key)),
-    moment(display,load("images/instruct_06.png")),
+    moment(display,"images/instruct_06.png"),
     await_response(iskeydown(end_break_key)))
 
   addpractice(practice_trial(:normal,:w2nw,10response_spacing,phase="practice"))
